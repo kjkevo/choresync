@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS variables (light / dark) ────────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+
+    /* Semantic surface tokens */
+    --cs-bg:       #f8fafc;   /* slate-50   */
+    --cs-surface:  #ffffff;   /* white      */
+    --cs-border:   #e2e8f0;   /* slate-200  */
+    --cs-text:     #0f172a;   /* slate-900  */
+    --cs-muted:    #64748b;   /* slate-500  */
+    --cs-inset:    #f1f5f9;   /* slate-100  */
+    color-scheme:  light;
+  }
+
+  html.dark {
+    --cs-bg:       #0f172a;   /* slate-900  */
+    --cs-surface:  #1e293b;   /* slate-800  */
+    --cs-border:   #334155;   /* slate-700  */
+    --cs-text:     #f1f5f9;   /* slate-100  */
+    --cs-muted:    #94a3b8;   /* slate-400  */
+    --cs-inset:    #0f172a;   /* slate-900  */
+    color-scheme:  dark;
+  }
+
+  * {
+    border-color: var(--cs-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--cs-bg);
+    color: var(--cs-text);
+    font-feature-settings: 'cv11', 'ss01';
+    @apply antialiased transition-colors duration-200;
+  }
+
+  /* Focus rings */
+  :focus-visible {
+    @apply outline-none ring-2 ring-indigo-500 ring-offset-2;
+  }
+  html.dark :focus-visible {
+    @apply ring-offset-slate-900;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { @apply w-1.5 h-1.5; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply rounded-full; background: var(--cs-border); }
+
+  /* Smooth page transitions */
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+}
+
+/* ── Shared component classes ────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Inputs ────────────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-xl border px-4 py-3
+           text-sm placeholder:text-slate-400
+           transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500
+           disabled:cursor-not-allowed disabled:opacity-50;
+    background: var(--cs-surface);
+    border-color: var(--cs-border);
+    color: var(--cs-text);
+  }
+  .input:focus {
+    background: var(--cs-surface);
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide;
+    color: var(--cs-muted);
+  }
+
+  /* ── Buttons ───────────────────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl bg-indigo-600 px-5 py-2.5
+           text-sm font-semibold text-white
+           transition-all duration-150 hover:bg-indigo-700 active:scale-[0.98]
+           disabled:cursor-not-allowed disabled:opacity-50
+           shadow-sm hover:shadow-indigo-500/25 hover:shadow-md;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl border px-5 py-2.5
+           text-sm font-semibold
+           transition-all duration-150 active:scale-[0.98] disabled:opacity-50;
+    border-color: var(--cs-border);
+    background: var(--cs-surface);
+    color: var(--cs-text);
+  }
+  .btn-ghost:hover {
+    @apply border-indigo-300 text-indigo-700;
+    background: #eef2ff; /* indigo-50 */
+  }
+  html.dark .btn-ghost:hover {
+    background: #1e1b4b;
+    @apply border-indigo-500 text-indigo-300;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl bg-red-50 px-5 py-2.5
+           text-sm font-semibold text-red-600
+           transition-all duration-150 hover:bg-red-600 hover:text-white
+           active:scale-[0.98] disabled:opacity-50;
+  }
+  html.dark .btn-danger {
+    @apply bg-red-950/50 text-red-400 hover:bg-red-600 hover:text-white;
+  }
+
+  /* ── Cards ─────────────────────────────────────────────────────────────── */
+  .card {
+    @apply rounded-2xl p-6 shadow-sm;
+    background: var(--cs-surface);
+    outline: 1px solid var(--cs-border);
+    outline-offset: -1px;
+  }
+
+  .card-inset {
+    @apply rounded-xl p-4;
+    background: var(--cs-inset);
+    border: 1px solid var(--cs-border);
+  }
+
+  /* ── Alerts ────────────────────────────────────────────────────────────── */
+  .alert-error {
+    @apply rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700;
+  }
+  html.dark .alert-error {
+    @apply border-red-800/50 bg-red-950/50 text-red-300;
+  }
+
+  .alert-success {
+    @apply rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700;
+  }
+  html.dark .alert-success {
+    @apply border-emerald-800/50 bg-emerald-950/50 text-emerald-300;
+  }
+
+  /* ── Page skeleton (loading state) ─────────────────────────────────────── */
+  .skeleton {
+    @apply animate-pulse rounded-lg;
+    background: var(--cs-border);
+  }
+
+  /* ── Toggle switch ──────────────────────────────────────────────────────── */
+  .toggle {
+    @apply relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full
+           border-2 border-transparent
+           transition-colors duration-200 ease-in-out
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2;
+  }
+  .toggle-thumb {
+    @apply pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md
+           ring-0 transition duration-200 ease-in-out;
+  }
+
+  /* ── Section divider ────────────────────────────────────────────────────── */
+  .section-title {
+    @apply text-xs font-bold uppercase tracking-widest;
+    color: var(--cs-muted);
+  }
+
+  /* ── Nav header ─────────────────────────────────────────────────────────── */
+  .app-header {
+    @apply sticky top-0 z-40 border-b backdrop-blur-sm;
+    background: color-mix(in srgb, var(--cs-surface) 90%, transparent);
+    border-color: var(--cs-border);
+  }
+
+  .nav-link {
+    @apply flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150;
+    color: var(--cs-muted);
+  }
+  .nav-link:hover {
+    background: var(--cs-inset);
+    color: var(--cs-text);
+  }
+  .nav-link.active {
+    @apply bg-indigo-600 text-white shadow-sm;
+  }
+
+  /* ── Gradient hero strip ────────────────────────────────────────────────── */
+  .hero-strip {
+    @apply bg-gradient-to-r from-indigo-500 to-purple-600 px-4 pb-16 pt-10 text-white;
+  }
+  html.dark .hero-strip {
+    @apply from-indigo-700 to-purple-800;
+  }
+
+  /* ── Floating card over hero ────────────────────────────────────────────── */
+  .hero-float {
+    @apply mx-auto -mt-12 max-w-lg space-y-4 px-4 pb-24;
+  }
+
+  /* ── Animate in ─────────────────────────────────────────────────────────── */
+  .animate-in {
+    animation: cs-fade-in 0.2s ease-out both;
+  }
+  .animate-in-up {
+    animation: cs-slide-up 0.25s ease-out both;
+  }
+
+  @keyframes cs-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cs-slide-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Stagger children ───────────────────────────────────────────────────── */
+  .stagger > *:nth-child(1) { animation-delay: 0ms;  }
+  .stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger > *:nth-child(5) { animation-delay: 200ms; }
+}
