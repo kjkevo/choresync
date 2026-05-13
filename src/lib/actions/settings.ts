@@ -147,6 +147,3 @@ export async function deleteAccount() {
   redirect('/login')
 }
 
-// ── Leave household ───────────────────────────────────────────────────────────
-// Re-exported here so the Settings page only needs one import
-export { leaveHousehold } from './household'

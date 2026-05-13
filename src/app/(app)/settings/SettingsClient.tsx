@@ -7,9 +7,8 @@ import {
   addCustomCategory,
   removeCustomCategory,
   deleteAccount,
-  leaveHousehold,
 } from '@/lib/actions/settings'
-import { updateHouseholdName } from '@/lib/actions/household'
+import { updateHouseholdName, leaveHousehold } from '@/lib/actions/household'
 import type { HouseholdSettings, UserRow } from '@/lib/types/database'
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
