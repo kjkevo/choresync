@@ -146,10 +146,12 @@ export default function ChoreModal({
         ? await updateChore(chore!.id, fd)
         : await createChore(fd)
 
-      if (result?.error) {
-        setError(result.error)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = result as any
+      if (res?.error) {
+        setError(res.error as string)
       } else {
-        onSaved?.(result.chore as ChoreRow)
+        onSaved?.(res?.chore as ChoreRow)
         onClose()
       }
     })

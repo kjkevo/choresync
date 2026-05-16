@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import HistoryClient from './HistoryClient'
 import type {
   UserRow,
+  ChoreCompletionRow,
   ChoreCompletionWithMember,
   AnalyticsSummary,
   MemberStat,
   CategoryStat,
   WeeklyTrend,
 } from '@/lib/types/database'
+
 
 export const metadata: Metadata = { title: 'History & Reports' }
 export const dynamic = 'force-dynamic'
@@ -118,12 +120,14 @@ export default async function HistoryPage() {
   const { data: memberRows } = await supabase
     .from('household_members').select('user_id, color_theme').eq('household_id', householdId)
 
-  const colorMap      = Object.fromEntries((memberRows ?? []).map(m => [m.user_id, m.color_theme]))
-  const memberUserIds = (memberRows ?? []).map(m => m.user_id)
+  const memberRowsTyped = (memberRows ?? []) as { user_id: string; color_theme: string }[]
+  const colorMap      = Object.fromEntries(memberRowsTyped.map(m => [m.user_id, m.color_theme]))
+  const memberUserIds = memberRowsTyped.map(m => m.user_id)
 
-  const { data: memberProfiles } = await supabase
+  const { data: memberProfilesRaw } = await supabase
     .from('users').select('id, full_name, avatar_url, email').in('id', memberUserIds)
-  const profileMap = Object.fromEntries((memberProfiles ?? []).map(p => [p.id, p as UserRow]))
+  const memberProfiles = (memberProfilesRaw ?? []) as UserRow[]
+  const profileMap: Record<string, UserRow> = Object.fromEntries(memberProfiles.map(p => [p.id, p]))
 
   const members = memberUserIds.map(uid => ({
     id:        uid,
@@ -144,7 +148,7 @@ export default async function HistoryPage() {
     .order('completed_at', { ascending: false })
     .limit(500)
 
-  const completions = raw ?? []
+  const completions = (raw ?? []) as ChoreCompletionRow[]
 
   // Enrich log entries with member info
   const logEntries: ChoreCompletionWithMember[] = completions.map(c => ({

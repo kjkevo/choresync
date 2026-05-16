@@ -1,4 +1,4 @@
-// Auto-generated types for the ChoreSync Supabase schema.
+// Hand-written types for the ChoreSync Supabase schema.
 // Regenerate with: npx supabase gen types typescript --linked > src/lib/types/database.ts
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
@@ -29,6 +29,7 @@ export interface Database {
           avatar_url?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       households: {
         Row: {
@@ -51,9 +52,11 @@ export interface Database {
         }
         Update: {
           name?: string
+          invite_code?: string
           settings?: Json
           updated_at?: string
         }
+        Relationships: []
       }
       household_members: {
         Row: {
@@ -76,6 +79,7 @@ export interface Database {
           role?: 'admin' | 'member'
           color_theme?: string
         }
+        Relationships: []
       }
       chores: {
         Row: {
@@ -147,6 +151,7 @@ export interface Database {
           rotation_index?: number
           points?: number
         }
+        Relationships: []
       }
       swap_requests: {
         Row: {
@@ -173,6 +178,7 @@ export interface Database {
           status?: 'pending' | 'accepted' | 'declined'
           updated_at?: string
         }
+        Relationships: []
       }
       point_events: {
         Row: {
@@ -193,7 +199,10 @@ export interface Database {
           points: number
           earned_at?: string
         }
-        Update: never
+        Update: {
+          points?: number
+        }
+        Relationships: []
       }
       badges: {
         Row: {
@@ -210,7 +219,10 @@ export interface Database {
           badge_type: BadgeType
           earned_at?: string
         }
-        Update: never
+        Update: {
+          badge_type?: BadgeType
+        }
+        Relationships: []
       }
       user_streaks: {
         Row: {
@@ -240,6 +252,135 @@ export interface Database {
           total_completions?: number
           updated_at?: string
         }
+        Relationships: []
+      }
+      chore_completions: {
+        Row: {
+          id: string
+          household_id: string
+          chore_id: string | null
+          chore_name: string
+          category: string
+          priority: string
+          completed_by: string
+          completed_at: string
+          due_date: string | null
+          was_on_time: boolean | null
+          points: number
+          photo_proof_url: string | null
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          chore_id?: string | null
+          chore_name: string
+          category?: string
+          priority?: string
+          completed_by: string
+          completed_at?: string
+          due_date?: string | null
+          was_on_time?: boolean | null
+          points?: number
+          photo_proof_url?: string | null
+        }
+        Update: {
+          photo_proof_url?: string | null
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          id: string
+          household_id: string
+          user_id: string
+          content: string
+          created_at: string
+          edited_at: string | null
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          user_id: string
+          content: string
+          created_at?: string
+          edited_at?: string | null
+        }
+        Update: {
+          content?: string
+          edited_at?: string | null
+        }
+        Relationships: []
+      }
+      message_reactions: {
+        Row: {
+          id: string
+          message_id: string
+          user_id: string
+          emoji: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          user_id: string
+          emoji: string
+          created_at?: string
+        }
+        Update: {
+          emoji?: string
+        }
+        Relationships: []
+      }
+      chore_comments: {
+        Row: {
+          id: string
+          chore_id: string
+          household_id: string
+          user_id: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          chore_id: string
+          household_id: string
+          user_id: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          content?: string
+        }
+        Relationships: []
+      }
+      announcements: {
+        Row: {
+          id: string
+          household_id: string
+          created_by: string
+          content: string
+          is_pinned: boolean
+          pinned_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          household_id: string
+          created_by: string
+          content: string
+          is_pinned?: boolean
+          pinned_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          is_pinned?: boolean
+          pinned_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: Record<string, never>

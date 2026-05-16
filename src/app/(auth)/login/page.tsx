@@ -1,13 +1,23 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Suspense, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import AuthLayout from '@/components/auth/AuthLayout'
 import OAuthButtons from '@/components/ui/OAuthButtons'
 import { logIn } from '@/lib/actions/auth'
 
+// useSearchParams requires a Suspense boundary in Next.js 15.
+// LoginContent contains everything that reads search params; LoginPage wraps it.
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
   const searchParams = useSearchParams()
   const urlError     = searchParams.get('error')
   const redirectTo   = searchParams.get('redirectTo') ?? '/dashboard'

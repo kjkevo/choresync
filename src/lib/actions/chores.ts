@@ -281,7 +281,8 @@ export async function completeChore(choreId: string, photoProofUrl?: string) {
     ? (todayStr <= chore.due_date ? true : false)
     : null
 
-  await supabase.from('chore_completions').insert({
+  // Non-blocking — don't fail the completion if this errors
+  void supabase.from('chore_completions').insert({
     household_id:    chore.household_id,
     chore_id:        choreId,
     chore_name:      chore.name,
@@ -293,7 +294,7 @@ export async function completeChore(choreId: string, photoProofUrl?: string) {
     was_on_time:     wasOnTime,
     points:          chore.points,
     photo_proof_url: photoProofUrl ?? null,
-  }).catch(() => undefined)   // non-blocking
+  })
 
   // Award points (non-blocking — don't fail the completion if this errors)
   if (chore.points > 0) {

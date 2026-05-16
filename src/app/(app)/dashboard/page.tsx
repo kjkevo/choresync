@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
-import type { ChoreWithAssignee, UserRow, LeaderboardEntry, AnnouncementWithAuthor } from '@/lib/types/database'
+import type { ChoreRow, ChoreWithAssignee, UserRow, LeaderboardEntry, AnnouncementRow, AnnouncementWithAuthor } from '@/lib/types/database'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
@@ -14,35 +14,38 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
-  const [{ data: profile }, { data: membership }] = await Promise.all([
+  const [{ data: profileRaw }, { data: membership }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),
     supabase.from('household_members').select('household_id, role, color_theme').eq('user_id', user.id).maybeSingle(),
   ])
+  const profile = profileRaw as UserRow | null
 
   if (!membership) redirect('/onboarding')
 
   const { household_id: householdId } = membership
 
   // ── 2. All members (for color map + leaderboard) ──────────────────────────
-  const { data: memberRows } = await supabase
+  const { data: memberRowsRaw } = await supabase
     .from('household_members')
     .select('user_id, color_theme')
     .eq('household_id', householdId)
 
-  const colorMap = Object.fromEntries((memberRows ?? []).map(m => [m.user_id, m.color_theme]))
+  const memberRows = (memberRowsRaw ?? []) as { user_id: string; color_theme: string }[]
+  const memberUserIds = memberRows.map(m => m.user_id)
+  const colorMap = Object.fromEntries(memberRows.map(m => [m.user_id, m.color_theme]))
 
-  const memberUserIds = (memberRows ?? []).map(m => m.user_id)
-  const { data: memberProfiles } = await supabase
+  const { data: memberProfilesRaw } = await supabase
     .from('users')
     .select('id, full_name, avatar_url, email')
     .in('id', memberUserIds)
 
-  const profileMap = Object.fromEntries((memberProfiles ?? []).map(p => [p.id, p as UserRow]))
+  const memberProfiles = (memberProfilesRaw ?? []) as UserRow[]
+  const profileMap: Record<string, UserRow> = Object.fromEntries(memberProfiles.map(p => [p.id, p]))
 
   // ── 3. My chores: today + overdue (assigned to me, incomplete) ────────────
   const today = new Date().toISOString().split('T')[0]
 
-  const { data: myChoreRows } = await supabase
+  const { data: myChoreRowsRaw } = await supabase
     .from('chores')
     .select('*')
     .eq('household_id', householdId)
@@ -52,10 +55,11 @@ export default async function DashboardPage() {
     .order('due_date', { ascending: true })
     .order('priority', { ascending: false })
 
-  const myChores: ChoreWithAssignee[] = (myChoreRows ?? []).map(c => ({
+  const myChoreRows = (myChoreRowsRaw ?? []) as ChoreRow[]
+  const myChores: ChoreWithAssignee[] = myChoreRows.map(c => ({
     ...c,
-    rotation_members: Array.isArray(c.rotation_members) ? c.rotation_members as string[] : [],
-    assignee: profile as UserRow,
+    rotation_members: Array.isArray(c.rotation_members) ? c.rotation_members as unknown as string[] : [],
+    assignee: profile,
   }))
 
   const myOverdue = myChores.filter(c => c.due_date! < today)
@@ -90,20 +94,15 @@ export default async function DashboardPage() {
   const totalActiveCount = totalActive ?? 0
 
   // ── 5. Leaderboard: points this week + all-time ───────────────────────────
-  const [{ data: weekPointRows }, { data: allTimePointRows }] = await Promise.all([
-    supabase.from('point_events')
-      .select('user_id, points')
-      .eq('household_id', householdId)
+  const [{ data: weekPointRowsRaw }, { data: allTimePointRowsRaw }] = await Promise.all([
+    supabase.from('point_events').select('user_id, points').eq('household_id', householdId)
       .gte('earned_at', weekStart.toISOString()),
-    supabase.from('point_events')
-      .select('user_id, points')
-      .eq('household_id', householdId),
+    supabase.from('point_events').select('user_id, points').eq('household_id', householdId),
   ])
 
-  const weekByUser    = aggregatePoints(weekPointRows    ?? [])
-  const allTimeByUser = aggregatePoints(allTimePointRows ?? [])
+  const weekByUser    = aggregatePoints((weekPointRowsRaw    ?? []) as { user_id: string; points: number }[])
+  const allTimeByUser = aggregatePoints((allTimePointRowsRaw ?? []) as { user_id: string; points: number }[])
 
-  // Build leaderboard — include all members even with 0 points
   const leaderboard: LeaderboardEntry[] = memberUserIds
     .map(uid => ({
       userId:         uid,
@@ -116,31 +115,28 @@ export default async function DashboardPage() {
     .sort((a, b) => b.pointsThisWeek - a.pointsThisWeek || b.pointsAllTime - a.pointsAllTime)
 
   // ── 6. Household name + my streak + pinned announcements ─────────────────
-  const [{ data: household }, { data: myStreak }, { data: pinnedRows }] = await Promise.all([
+  const [{ data: householdRaw }, { data: myStreak }, { data: pinnedRowsRaw }] = await Promise.all([
     supabase.from('households').select('name').eq('id', householdId).maybeSingle(),
-    supabase
-      .from('user_streaks')
-      .select('current_streak, total_completions')
-      .eq('user_id',      user.id)
-      .eq('household_id', householdId)
-      .maybeSingle(),
-    supabase
-      .from('announcements')
-      .select('*')
-      .eq('household_id', householdId)
-      .eq('is_pinned', true)
-      .order('pinned_at', { ascending: false })
-      .limit(3),
+    supabase.from('user_streaks').select('current_streak, total_completions')
+      .eq('user_id', user.id).eq('household_id', householdId).maybeSingle(),
+    supabase.from('announcements').select('*')
+      .eq('household_id', householdId).eq('is_pinned', true)
+      .order('pinned_at', { ascending: false }).limit(3),
   ])
 
-  // Enrich announcements with author names
-  const pinnedAuthorIds = [...new Set((pinnedRows ?? []).map(a => a.created_by))]
-  const { data: pinnedAuthors } = pinnedAuthorIds.length
-    ? await supabase.from('users').select('id, full_name, avatar_url, email').in('id', pinnedAuthorIds)
-    : { data: [] }
-  const pinnedAuthorMap = Object.fromEntries((pinnedAuthors ?? []).map(p => [p.id, p as UserRow]))
+  const household  = householdRaw  as { name: string } | null
+  const pinnedRows = (pinnedRowsRaw ?? []) as AnnouncementRow[]
 
-  const pinnedAnnouncements: AnnouncementWithAuthor[] = (pinnedRows ?? []).map(a => ({
+  const pinnedAuthorIds = [...new Set(pinnedRows.map(a => a.created_by))]
+  const { data: pinnedAuthorsRaw } = pinnedAuthorIds.length
+    ? await supabase.from('users').select('id, full_name, avatar_url, email').in('id', pinnedAuthorIds)
+    : { data: [] as UserRow[] }
+
+  const pinnedAuthorMap: Record<string, UserRow> = Object.fromEntries(
+    ((pinnedAuthorsRaw ?? []) as UserRow[]).map(p => [p.id, p])
+  )
+
+  const pinnedAnnouncements: AnnouncementWithAuthor[] = pinnedRows.map(a => ({
     ...a,
     author: pinnedAuthorMap[a.created_by] ?? null,
   }))

@@ -73,18 +73,18 @@ export async function respondToSwap(swapId: string, accept: boolean) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated.' }
 
-  const { data: swap } = await supabase
+  // Fetch swap request without a join (Relationships not defined in hand-written types)
+  const { data: swapRaw } = await supabase
     .from('swap_requests')
-    .select(`
-      *,
-      chore:chore_id ( household_id, assigned_to, rotation_enabled, rotation_members, rotation_index )
-    `)
+    .select('*')
     .eq('id', swapId)
     .maybeSingle()
 
-  if (!swap) return { error: 'Swap request not found.' }
-  if (swap.requestee_id !== user.id) return { error: 'Not authorised.' }
-  if (swap.status !== 'pending') return { error: 'This request is no longer pending.' }
+  if (!swapRaw) return { error: 'Swap request not found.' }
+  if (swapRaw.requestee_id !== user.id) return { error: 'Not authorised.' }
+  if (swapRaw.status !== 'pending') return { error: 'This request is no longer pending.' }
+
+  const swap = swapRaw
 
   if (!accept) {
     const { error } = await supabase
@@ -96,17 +96,16 @@ export async function respondToSwap(swapId: string, accept: boolean) {
     return { success: true }
   }
 
-  // Accept: reassign chore to requestee (current user)
-  const chore = swap.chore as {
-    household_id: string
-    assigned_to: string | null
-    rotation_enabled: boolean
-    rotation_members: string[]
-    rotation_index: number
-  } | null
+  // Accept: fetch chore details separately, then reassign to requestee (current user)
+  const { data: chore } = await supabase
+    .from('chores')
+    .select('household_id, assigned_to, rotation_enabled, rotation_members, rotation_index')
+    .eq('id', swap.chore_id)
+    .maybeSingle()
+
   if (!chore) return { error: 'Chore no longer exists.' }
 
-  const updatePayload: Record<string, unknown> = { assigned_to: user.id }
+  const updatePayload: { assigned_to: string; rotation_index?: number } = { assigned_to: user.id }
 
   if (chore.rotation_enabled) {
     const members = (chore.rotation_members ?? []) as string[]
@@ -156,7 +155,7 @@ export async function manualOverride(choreId: string, newUserId: string) {
   })
   if (!isAdmin) return { error: 'Only admins can manually reassign chores.' }
 
-  const updatePayload: Record<string, unknown> = { assigned_to: newUserId }
+  const updatePayload: { assigned_to: string; rotation_index?: number } = { assigned_to: newUserId }
 
   if (chore.rotation_enabled) {
     const members = (chore.rotation_members ?? []) as string[]

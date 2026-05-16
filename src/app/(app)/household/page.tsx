@@ -41,7 +41,7 @@ export default async function HouseholdPage() {
   // ── 3. All members + their user profiles ─────────────────────────────────
   const { data: memberships } = await supabase
     .from('household_members')
-    .select('id, user_id, role, color_theme, joined_at')
+    .select('id, user_id, household_id, role, color_theme, joined_at')
     .eq('household_id', householdId)
     .order('joined_at', { ascending: true })
 
@@ -49,7 +49,7 @@ export default async function HouseholdPage() {
 
   const { data: profiles } = await supabase
     .from('users')
-    .select('id, full_name, avatar_url, email')
+    .select('id, full_name, avatar_url, email, created_at, updated_at')
     .in('id', memberIds)
 
   // Zip memberships + profiles together into enriched members

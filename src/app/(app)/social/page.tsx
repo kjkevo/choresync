@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import SocialClient from './SocialClient'
 import type {
   UserRow,
-  MessageWithMeta,
+  MessageRow,
   MessageReactionRow,
+  AnnouncementRow,
+  MessageWithMeta,
   AnnouncementWithAuthor,
 } from '@/lib/types/database'
 
@@ -19,56 +21,54 @@ export default async function SocialPage() {
   if (!user) redirect('/login')
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
-  const [{ data: profile }, { data: membership }] = await Promise.all([
+  const [{ data: profileRaw }, { data: membership }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),
     supabase.from('household_members')
       .select('household_id, role, color_theme')
-      .eq('user_id', user.id)
-      .maybeSingle(),
+      .eq('user_id', user.id).maybeSingle(),
   ])
+  const profile = profileRaw as UserRow | null
 
   if (!membership) redirect('/onboarding')
   const { household_id: householdId, role } = membership
   const isAdmin = role === 'admin'
 
   // ── 2. All household members ──────────────────────────────────────────────
-  const { data: memberRows } = await supabase
+  const { data: memberRowsRaw } = await supabase
     .from('household_members')
     .select('user_id, color_theme')
     .eq('household_id', householdId)
 
-  const memberUserIds = (memberRows ?? []).map(m => m.user_id)
-  const colorMap = Object.fromEntries((memberRows ?? []).map(m => [m.user_id, m.color_theme]))
+  const memberRows = (memberRowsRaw ?? []) as { user_id: string; color_theme: string }[]
+  const memberUserIds = memberRows.map(m => m.user_id)
+  const colorMap = Object.fromEntries(memberRows.map(m => [m.user_id, m.color_theme]))
 
-  const { data: memberProfiles } = await supabase
+  const { data: memberProfilesRaw } = await supabase
     .from('users')
     .select('id, full_name, avatar_url, email')
     .in('id', memberUserIds)
 
-  const profileMap = Object.fromEntries((memberProfiles ?? []).map(p => [p.id, p as UserRow]))
+  const memberProfiles = (memberProfilesRaw ?? []) as UserRow[]
+  const profileMap: Record<string, UserRow> = Object.fromEntries(memberProfiles.map(p => [p.id, p]))
 
   // ── 3. Last 80 messages + their reactions ─────────────────────────────────
-  const { data: rawMessages } = await supabase
+  const { data: rawMessagesRaw } = await supabase
     .from('messages')
     .select('*')
     .eq('household_id', householdId)
     .order('created_at', { ascending: false })
     .limit(80)
 
-  const messages = (rawMessages ?? []).reverse()  // oldest-first for display
+  const messages = ((rawMessagesRaw ?? []) as MessageRow[]).reverse()
   const messageIds = messages.map(m => m.id)
 
-  const { data: reactions } = messageIds.length
-    ? await supabase
-        .from('message_reactions')
-        .select('*')
-        .in('message_id', messageIds)
-    : { data: [] }
+  const { data: reactionsRaw } = messageIds.length
+    ? await supabase.from('message_reactions').select('*').in('message_id', messageIds)
+    : { data: [] as MessageReactionRow[] }
 
-  // Group reactions by message_id
   const reactionsByMessage: Record<string, MessageReactionRow[]> = {}
-  for (const r of reactions ?? []) {
-    ;(reactionsByMessage[r.message_id] ??= []).push(r as MessageReactionRow)
+  for (const r of (reactionsRaw ?? []) as MessageReactionRow[]) {
+    ;(reactionsByMessage[r.message_id] ??= []).push(r)
   }
 
   const enrichedMessages: MessageWithMeta[] = messages.map(m => ({
@@ -78,30 +78,29 @@ export default async function SocialPage() {
   }))
 
   // ── 4. Announcements ──────────────────────────────────────────────────────
-  const { data: rawAnnouncements } = await supabase
+  const { data: rawAnnouncementsRaw } = await supabase
     .from('announcements')
     .select('*')
     .eq('household_id', householdId)
-    .order('is_pinned', { ascending: false })
+    .order('is_pinned',   { ascending: false })
     .order('created_at',  { ascending: false })
 
-  const enrichedAnnouncements: AnnouncementWithAuthor[] = (rawAnnouncements ?? []).map(a => ({
+  const rawAnnouncements = (rawAnnouncementsRaw ?? []) as AnnouncementRow[]
+  const enrichedAnnouncements: AnnouncementWithAuthor[] = rawAnnouncements.map(a => ({
     ...a,
     author: profileMap[a.created_by] ?? null,
   }))
 
   // ── 5. Household name ─────────────────────────────────────────────────────
-  const { data: household } = await supabase
-    .from('households')
-    .select('name')
-    .eq('id', householdId)
-    .maybeSingle()
+  const { data: householdRaw } = await supabase
+    .from('households').select('name').eq('id', householdId).maybeSingle()
+  const household = householdRaw as { name: string } | null
 
   const members = memberUserIds.map(uid => ({
-    id:       uid,
-    name:     profileMap[uid]?.full_name ?? null,
+    id:        uid,
+    name:      profileMap[uid]?.full_name ?? null,
     avatarUrl: profileMap[uid]?.avatar_url ?? null,
-    color:    colorMap[uid] ?? '#6366f1',
+    color:     colorMap[uid] ?? '#6366f1',
   }))
 
   return (

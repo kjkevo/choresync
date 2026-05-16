@@ -24,11 +24,27 @@ export default async function ProfilePage() {
     .eq('id', user.id)
     .single()
 
-  const { data: membership } = await supabase
+  const { data: membershipRow } = await supabase
     .from('household_members')
-    .select('role, color_theme, household:households(id, name)')
+    .select('role, color_theme, household_id')
     .eq('user_id', user.id)
     .maybeSingle()
+
+  let membership: { role: 'admin' | 'member'; color_theme: string; household: { id: string; name: string } | null } | null = null
+
+  if (membershipRow) {
+    const { data: household } = await supabase
+      .from('households')
+      .select('id, name')
+      .eq('id', membershipRow.household_id)
+      .maybeSingle()
+
+    membership = {
+      role:        membershipRow.role,
+      color_theme: membershipRow.color_theme,
+      household:   household ?? null,
+    }
+  }
 
   return (
     <ProfileClient

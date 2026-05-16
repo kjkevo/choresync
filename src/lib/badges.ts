@@ -5,6 +5,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 
+
 export type BadgeType =
   | 'first_chore'
   | 'chores_10'
@@ -41,7 +42,11 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
   top_contributor: { emoji: '👑', label: 'Top Contributor',   desc: 'Most points in the household this month',             rarity: 'rare',   repeatable: true  },
 }
 
-type Supabase = SupabaseClient<Database>
+// Using SupabaseClient<any> to stay compatible with both the old 3-param
+// return type from @supabase/ssr and the new 5-param SupabaseClient in
+// @supabase/supabase-js v2.105+.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Supabase = SupabaseClient<any>
 
 // ── Public entry point ────────────────────────────────────────────────────────
 

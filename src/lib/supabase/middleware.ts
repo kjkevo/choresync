@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/lib/types/database'
 
@@ -19,7 +19,7 @@ export function createMiddlewareClient(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[], headers?: Record<string, string>) {
           // Forward cookies to the request (for downstream server components)
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
@@ -29,6 +29,12 @@ export function createMiddlewareClient(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
+          // Forward auth-required cache headers (new in @supabase/ssr 0.10+)
+          if (headers) {
+            Object.entries(headers).forEach(([key, value]) =>
+              response.headers.set(key, value)
+            )
+          }
         },
       },
     }

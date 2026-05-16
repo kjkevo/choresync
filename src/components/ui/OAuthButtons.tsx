@@ -12,13 +12,16 @@ interface OAuthButtonsProps {
  * Rendered client-side so we can access window.location.origin at runtime.
  */
 export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtonsProps) {
-  const supabase = createClient()
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function signInWithProvider(provider: 'google' | 'apple') {
     setLoading(provider)
     setError(null)
+
+    // Lazily create the client so it's never called during server-side
+    // pre-rendering (env vars are only available at runtime in the browser).
+    const supabase = createClient()
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

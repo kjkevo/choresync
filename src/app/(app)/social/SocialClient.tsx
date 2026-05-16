@@ -200,7 +200,9 @@ function ChatTab({
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev
             const member = memberById[newMsg.user_id] ?? null
-            return [...prev, { ...newMsg, author: member, reactions: [] }]
+            // Cast member to UserRow | null — real-time payloads only have
+            // the subset of fields we need; the author type is widened here.
+            return [...prev, { ...newMsg, author: member as unknown as UserRow | null, reactions: [] }]
           })
           setTimeout(() => scrollToBottom(true), 50)
         },
