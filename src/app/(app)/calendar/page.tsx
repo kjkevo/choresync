@@ -26,7 +26,7 @@ export default async function CalendarPage() {
     .from('household_members')
     .select('user_id, color_theme')
     .eq('household_id', householdId)
-
+    .returns<{ user_id: string; color_theme: string }[]>()
   const memberUserIds = (memberRows ?? []).map(m => m.user_id)
   const colorMap = Object.fromEntries((memberRows ?? []).map(m => [m.user_id, m.color_theme]))
 
