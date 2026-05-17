@@ -18,14 +18,19 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
   if (/[^A-Za-z0-9]/.test(pw)) score++
 
   const map = [
-    { score: 0, label: '',          color: 'bg-slate-200'   },
-    { score: 1, label: 'Weak',      color: 'bg-red-400'     },
-    { score: 2, label: 'Fair',      color: 'bg-amber-400'   },
-    { score: 3, label: 'Good',      color: 'bg-emerald-400' },
-    { score: 4, label: 'Strong',    color: 'bg-emerald-500' },
+    { score: 0, label: '',       color: 'bg-slate-200'   },
+    { score: 1, label: 'Weak',   color: 'bg-red-400'     },
+    { score: 2, label: 'Fair',   color: 'bg-amber-400'   },
+    { score: 3, label: 'Good',   color: 'bg-emerald-400' },
+    { score: 4, label: 'Strong', color: 'bg-emerald-500' },
   ]
   return map[score]
 }
+
+const inputClass =
+  'w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100'
+
+const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide'
 
 export default function SignupPage() {
   const [isPending, startTransition] = useTransition()
@@ -44,100 +49,67 @@ export default function SignupPage() {
     const pw       = formData.get('password') as string
     const confirm  = formData.get('confirmPassword') as string
 
-    if (pw !== confirm) {
-      setError('Passwords do not match.')
-      return
-    }
-    if (pw.length < PASSWORD_MIN) {
-      setError(`Password must be at least ${PASSWORD_MIN} characters.`)
-      return
-    }
+    if (pw !== confirm) { setError('Passwords do not match.'); return }
+    if (pw.length < PASSWORD_MIN) { setError(`Password must be at least ${PASSWORD_MIN} characters.`); return }
 
     startTransition(async () => {
       const result = await signUp(formData)
-      if (result?.error) {
-        setError(result.error)
-        setStatus('error')
-      } else {
-        setStatus('success')
-      }
+      if (result?.error) { setError(result.error); setStatus('error') }
+      else { setStatus('success') }
     })
   }
 
   if (status === 'success') {
     return (
-      <AuthLayout title="Check your inbox" subtitle="One more step to get started">
+      <AuthLayout title="Check your inbox!" subtitle="One more step to go" emoji="📬">
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-          <div className="mb-3 text-4xl">📬</div>
-          <h2 className="mb-2 font-semibold text-slate-900">Confirmation email sent</h2>
           <p className="text-sm text-slate-600">
-            We sent a link to your email. Click it to confirm your account and you&apos;re in!
+            We sent a confirmation link to your email. Click it to activate your account!
           </p>
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">
           Already confirmed?{' '}
-          <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
-            Sign in
-          </Link>
+          <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-500">Sign in</Link>
         </p>
       </AuthLayout>
     )
   }
 
   return (
-    <AuthLayout
-      title="Create your account"
-      subtitle="Set up your household in minutes"
-    >
-      {/* OAuth */}
+    <AuthLayout title="Create account" subtitle="Set up your household in minutes" emoji="✨">
+
+      {/* Social buttons */}
       <OAuthButtons />
 
       {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-slate-200" />
         <span className="text-xs font-medium text-slate-400">or sign up with email</span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      {/* Error */}
       {error && (
-        <div className="alert-error mb-4" role="alert">
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
         {/* Full name */}
         <div>
-          <label htmlFor="fullName" className="label">Full name</label>
-          <input
-            id="fullName"
-            name="fullName"
-            type="text"
-            autoComplete="name"
-            required
-            placeholder="Alex Johnson"
-            className="input"
-          />
+          <label htmlFor="fullName" className={labelClass}>Full name</label>
+          <input id="fullName" name="fullName" type="text" autoComplete="name" required placeholder="Alex Johnson" className={inputClass} />
         </div>
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="label">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="you@example.com"
-            className="input"
-          />
+          <label htmlFor="email" className={labelClass}>Email address</label>
+          <input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" className={inputClass} />
         </div>
 
         {/* Password */}
         <div>
-          <label htmlFor="password" className="label">Password</label>
+          <label htmlFor="password" className={labelClass}>Password</label>
           <div className="relative">
             <input
               id="password"
@@ -147,14 +119,14 @@ export default function SignupPage() {
               required
               minLength={PASSWORD_MIN}
               placeholder="Min. 8 characters"
-              className="input pr-12"
+              className={`${inputClass} pr-12`}
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
             <button
               type="button"
               onClick={() => setShowPw(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               aria-label={showPw ? 'Hide password' : 'Show password'}
             >
               {showPw ? <EyeOffIcon /> : <EyeIcon />}
@@ -166,19 +138,11 @@ export default function SignupPage() {
             <div className="mt-2 space-y-1">
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(i => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      i <= strength.score ? strength.color : 'bg-slate-200'
-                    }`}
-                  />
+                  <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= strength.score ? strength.color : 'bg-slate-200'}`} />
                 ))}
               </div>
               {strength.label && (
-                <p className="text-xs text-slate-500">
-                  Password strength:{' '}
-                  <span className="font-semibold text-slate-700">{strength.label}</span>
-                </p>
+                <p className="text-xs text-slate-400">Strength: <span className="font-semibold text-slate-600">{strength.label}</span></p>
               )}
             </div>
           )}
@@ -186,46 +150,37 @@ export default function SignupPage() {
 
         {/* Confirm password */}
         <div>
-          <label htmlFor="confirmPassword" className="label">Confirm password</label>
+          <label htmlFor="confirmPassword" className={labelClass}>Confirm password</label>
           <input
             id="confirmPassword"
             name="confirmPassword"
             type={showPw ? 'text' : 'password'}
             autoComplete="new-password"
             required
-            placeholder="••••••••"
-            className="input"
+            placeholder="••••••••••"
+            className={inputClass}
           />
         </div>
 
+        {/* Submit */}
         <button
           type="submit"
           disabled={isPending}
-          className="btn-primary w-full"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
         >
-          {isPending ? (
-            <>
-              <Spinner />
-              Creating account…
-            </>
-          ) : (
-            'Create Account'
-          )}
+          {isPending ? <><Spinner /> Creating account…</> : 'Create Account'}
         </button>
 
         <p className="text-center text-xs text-slate-400">
           By signing up you agree to our{' '}
-          <Link href="/terms" className="underline hover:text-slate-600">Terms</Link>
-          {' '}and{' '}
+          <Link href="/terms" className="underline hover:text-slate-600">Terms</Link> and{' '}
           <Link href="/privacy" className="underline hover:text-slate-600">Privacy Policy</Link>.
         </p>
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
+      <p className="mt-5 text-center text-sm text-slate-500">
         Already have an account?{' '}
-        <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
-          Sign in
-        </Link>
+        <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-500">Sign in</Link>
       </p>
     </AuthLayout>
   )
