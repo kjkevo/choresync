@@ -52,13 +52,12 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         type="button"
         onClick={() => signInWithProvider('google')}
         disabled={loading !== null}
-        className="btn-ghost w-full"
+        className="inline-flex w-full items-center justify-center gap-3 rounded-xl
+                   border-2 border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700
+                   shadow-sm transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md
+                   active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading === 'google' ? (
-          <Spinner />
-        ) : (
-          <GoogleIcon />
-        )}
+        {loading === 'google' ? <Spinner /> : <GoogleIcon />}
         Continue with Google
       </button>
 
@@ -67,16 +66,12 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         type="button"
         onClick={() => signInWithProvider('apple')}
         disabled={loading !== null}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl
-                   bg-black px-5 py-3 text-sm font-semibold text-white
-                   transition hover:bg-gray-900 active:scale-[0.98]
-                   disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex w-full items-center justify-center gap-3 rounded-xl
+                   bg-slate-900 px-5 py-3 text-sm font-semibold text-white
+                   shadow-sm transition-all hover:bg-slate-800 hover:shadow-md
+                   active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading === 'apple' ? (
-          <Spinner className="text-white" />
-        ) : (
-          <AppleIcon />
-        )}
+        {loading === 'apple' ? <Spinner className="text-white" /> : <AppleIcon />}
         Continue with Apple
       </button>
     </div>
