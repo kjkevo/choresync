@@ -28,9 +28,7 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 }
 
 const inputClass =
-  'w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100'
-
-const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide'
+  'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20'
 
 export default function SignupPage() {
   const [isPending, startTransition] = useTransition()
@@ -61,84 +59,83 @@ export default function SignupPage() {
 
   if (status === 'success') {
     return (
-      <AuthLayout title="Check your inbox!" subtitle="One more step to go" emoji="📬">
+      <AuthLayout title="Check your inbox" subtitle="One last step to get started">
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-          <p className="text-sm text-slate-600">
-            We sent a confirmation link to your email. Click it to activate your account!
+          <div className="mb-3 mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+            <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="mb-1 font-semibold text-slate-900">Confirmation email sent</h2>
+          <p className="text-sm text-slate-500">
+            Click the link in your email to activate your account and get started.
           </p>
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">
           Already confirmed?{' '}
-          <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-500">Sign in</Link>
+          <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">Sign in</Link>
         </p>
       </AuthLayout>
     )
   }
 
   return (
-    <AuthLayout title="Create account" subtitle="Set up your household in minutes" emoji="✨">
+    <AuthLayout title="Create your account" subtitle="Set up your household in minutes — it's free">
 
-      {/* Social buttons */}
+      {/* Social login */}
       <OAuthButtons />
 
       {/* Divider */}
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-200" />
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-100" />
         <span className="text-xs font-medium text-slate-400">or sign up with email</span>
-        <div className="h-px flex-1 bg-slate-200" />
+        <div className="h-px flex-1 bg-slate-100" />
       </div>
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-3">
-        {/* Full name */}
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
         <div>
-          <label htmlFor="fullName" className={labelClass}>Full name</label>
+          <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-slate-700">Full name</label>
           <input id="fullName" name="fullName" type="text" autoComplete="name" required placeholder="Alex Johnson" className={inputClass} />
         </div>
 
-        {/* Email */}
         <div>
-          <label htmlFor="email" className={labelClass}>Email address</label>
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">Email address</label>
           <input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" className={inputClass} />
         </div>
 
-        {/* Password */}
         <div>
-          <label htmlFor="password" className={labelClass}>Password</label>
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
           <div className="relative">
             <input
-              id="password"
-              name="password"
+              id="password" name="password"
               type={showPw ? 'text' : 'password'}
-              autoComplete="new-password"
-              required
-              minLength={PASSWORD_MIN}
+              autoComplete="new-password" required minLength={PASSWORD_MIN}
               placeholder="Min. 8 characters"
-              className={`${inputClass} pr-12`}
+              className={`${inputClass} pr-11`}
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
             <button
-              type="button"
-              onClick={() => setShowPw(v => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              type="button" onClick={() => setShowPw(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               aria-label={showPw ? 'Hide password' : 'Show password'}
             >
               {showPw ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
 
-          {/* Strength meter */}
           {password.length > 0 && (
             <div className="mt-2 space-y-1">
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(i => (
-                  <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= strength.score ? strength.color : 'bg-slate-200'}`} />
+                  <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= strength.score ? strength.color : 'bg-slate-200'}`} />
                 ))}
               </div>
               {strength.label && (
@@ -148,27 +145,22 @@ export default function SignupPage() {
           )}
         </div>
 
-        {/* Confirm password */}
         <div>
-          <label htmlFor="confirmPassword" className={labelClass}>Confirm password</label>
+          <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-slate-700">Confirm password</label>
           <input
-            id="confirmPassword"
-            name="confirmPassword"
+            id="confirmPassword" name="confirmPassword"
             type={showPw ? 'text' : 'password'}
-            autoComplete="new-password"
-            required
-            placeholder="••••••••••"
+            autoComplete="new-password" required
+            placeholder="••••••••"
             className={inputClass}
           />
         </div>
 
-        {/* Submit */}
         <button
-          type="submit"
-          disabled={isPending}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+          type="submit" disabled={isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-60"
         >
-          {isPending ? <><Spinner /> Creating account…</> : 'Create Account'}
+          {isPending ? <><Spinner />Creating account…</> : 'Create account'}
         </button>
 
         <p className="text-center text-xs text-slate-400">
@@ -180,7 +172,7 @@ export default function SignupPage() {
 
       <p className="mt-5 text-center text-sm text-slate-500">
         Already have an account?{' '}
-        <Link href="/login" className="font-bold text-indigo-600 hover:text-indigo-500">Sign in</Link>
+        <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">Sign in</Link>
       </p>
     </AuthLayout>
   )

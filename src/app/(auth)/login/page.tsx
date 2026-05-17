@@ -7,7 +7,6 @@ import AuthLayout from '@/components/auth/AuthLayout'
 import OAuthButtons from '@/components/ui/OAuthButtons'
 import { logIn } from '@/lib/actions/auth'
 
-// useSearchParams requires a Suspense boundary in Next.js 15.
 export default function LoginPage() {
   return (
     <Suspense>
@@ -18,7 +17,7 @@ export default function LoginPage() {
 
 function LoginContent() {
   const searchParams = useSearchParams()
-  const urlError  = searchParams.get('error')
+  const urlError   = searchParams.get('error')
   const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
 
   const [isPending, startTransition] = useTransition()
@@ -36,48 +35,41 @@ function LoginContent() {
   }
 
   return (
-    <AuthLayout title="Welcome back!" subtitle="Sign in to your household" emoji="👋">
+    <AuthLayout title="Sign in" subtitle="Welcome back — good to see you again">
 
-      {/* Social buttons */}
+      {/* Social login */}
       <OAuthButtons redirectTo={redirectTo} />
 
       {/* Divider */}
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-medium text-slate-400">or login with email</span>
-        <div className="h-px flex-1 bg-slate-200" />
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-100" />
+        <span className="text-xs font-medium text-slate-400">or continue with email</span>
+        <div className="h-px flex-1 bg-slate-100" />
       </div>
 
-      {/* Error */}
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-3">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <input type="hidden" name="redirectTo" value={redirectTo} />
 
-        {/* Email */}
-        <div className="relative">
-          <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        <div>
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
             Email address
           </label>
           <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="Enter your email"
-            className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+            id="email" name="email" type="email" autoComplete="email" required
+            placeholder="you@example.com"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
         </div>
 
-        {/* Password */}
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <label htmlFor="password" className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <label htmlFor="password" className="text-sm font-medium text-slate-700">
               Password
             </label>
             <Link href="/forgot-password" className="text-xs font-semibold text-indigo-600 hover:text-indigo-500">
@@ -86,18 +78,16 @@ function LoginContent() {
           </div>
           <div className="relative">
             <input
-              id="password"
-              name="password"
+              id="password" name="password"
               type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              placeholder="••••••••••"
-              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3.5 pr-12 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+              autoComplete="current-password" required
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-11 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -105,20 +95,18 @@ function LoginContent() {
           </div>
         </div>
 
-        {/* Submit */}
         <button
-          type="submit"
-          disabled={isPending}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+          type="submit" disabled={isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-60"
         >
-          {isPending ? <><Spinner /> Signing in…</> : 'Login'}
+          {isPending ? <><Spinner />Signing in…</> : 'Sign in'}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-slate-500">
         Don&apos;t have an account?{' '}
-        <Link href="/signup" className="font-bold text-indigo-600 hover:text-indigo-500">
-          Sign up
+        <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
+          Create one free
         </Link>
       </p>
     </AuthLayout>
