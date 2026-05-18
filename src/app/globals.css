@@ -5,7 +5,16 @@
 /* ── CSS variables (light / dark) ────────────────────────────────────────── */
 @layer base {
   :root {
-    --font-inter: 'Inter', sans-serif;
+    --font-inter:   'Inter', sans-serif;
+    --font-poppins: 'Poppins', sans-serif;
+    --font-nunito:  'Nunito', sans-serif;
+
+    /* Brand — ChoreSync orange */
+    --brand:         #FF6B2B;
+    --brand-dark:    #e85a1f;
+    --brand-light:   #ff8f5e;
+    --brand-50:      #fff3ee;
+    --brand-100:     #ffe4d5;
 
     /* Semantic surface tokens */
     --cs-bg:       #f8fafc;   /* slate-50   */
