@@ -6,88 +6,104 @@ import Image from 'next/image'
 import { completeChore } from '@/lib/actions/chores'
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
 import { CATEGORY_META } from '@/components/chores/ChoreModal'
-import type { ChoreWithAssignee, UserRow, LeaderboardEntry, AnnouncementWithAuthor } from '@/lib/types/database'
+import type { ChoreWithAssignee, UserRow } from '@/lib/types/database'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ActivityEntry {
+  id:          string
+  choreName:   string
+  category:    string
+  completedAt: string
+  points:      number
+  wasOnTime:   boolean | null
+  member: {
+    id:       string
+    name:     string | null
+    avatarUrl:string | null
+    color:    string
+  } | null
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function greeting(name: string | null) {
   const h = new Date().getHours()
   const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
-  return `Good ${part}, ${name?.split(' ')[0] ?? 'there'}`
+  return `Good ${part}, ${name?.split(' ')[0] ?? 'there'} 👋`
 }
 
-function memberInitials(name: string | null) {
+function initials(name: string | null) {
   if (!name) return '?'
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function formatDue(iso: string) {
-  const today = new Date()
-  const d = new Date(iso)
-  if (
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth()    === today.getMonth() &&
-    d.getDate()     === today.getDate()
-  ) return 'Today'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1)  return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7)   return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+function formatDue(iso: string) {
+  const today = new Date().toISOString().split('T')[0]
+  if (iso === today) return 'Today'
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface DashboardClientProps {
-  currentUser:           UserRow
-  myOverdueChores:       ChoreWithAssignee[]
-  myTodayChores:         ChoreWithAssignee[]
-  weekDoneCount:         number
-  totalActiveCount:      number
-  householdName:         string
-  householdId:           string
-  colorMap:              Record<string, string>
-  leaderboard:           LeaderboardEntry[]
-  myStreak:              { current_streak: number; total_completions: number } | null
-  pinnedAnnouncements:   AnnouncementWithAuthor[]
+  currentUser:         UserRow
+  myOverdueChores:     ChoreWithAssignee[]
+  myTodayChores:       ChoreWithAssignee[]
+  householdName:       string
+  householdId:         string
+  colorMap:            Record<string, string>
+  myStreak:            { current_streak: number; total_completions: number } | null
+  pinnedAnnouncements: { id: string; content: string; author: UserRow | null }[]
+  recentActivity:      ActivityEntry[]
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DashboardClient({
   currentUser,
-  myOverdueChores:  initialOverdue,
-  myTodayChores:    initialToday,
-  weekDoneCount:    initialWeekDone,
-  totalActiveCount,
+  myOverdueChores:    initialOverdue,
+  myTodayChores:      initialToday,
   householdName,
   colorMap,
-  leaderboard,
   myStreak,
   pinnedAnnouncements,
+  recentActivity,
 }: DashboardClientProps) {
   const router = useRouter()
   const [overdueChores,  setOverdueChores]  = useState(initialOverdue)
   const [todayChores,    setTodayChores]    = useState(initialToday)
-  const [weekDone,       setWeekDone]       = useState(initialWeekDone)
   const [completeSheet,  setCompleteSheet]  = useState<ChoreWithAssignee | null>(null)
   const [quickPending,   setQuickPending]   = useState<Set<string>>(new Set())
-  const [leaderboardTab,    setLeaderboardTab]    = useState<'week' | 'alltime'>('week')
-  const [dismissedPins,     setDismissedPins]     = useState<Set<string>>(new Set())
-  const [, startTransition]                        = useTransition()
+  const [dismissedPins,  setDismissedPins]  = useState<Set<string>>(new Set())
+  const [, startTransition]                 = useTransition()
 
-  const visiblePins = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
+  const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
+  const totalPending = overdueChores.length + todayChores.length
 
   const removeFromLists = useCallback((choreId: string) => {
-    setOverdueChores(prev => prev.filter(c => c.id !== choreId))
-    setTodayChores(prev   => prev.filter(c => c.id !== choreId))
-    setWeekDone(prev => prev + 1)
+    setOverdueChores(p => p.filter(c => c.id !== choreId))
+    setTodayChores(p   => p.filter(c => c.id !== choreId))
   }, [])
 
   function handleQuickComplete(chore: ChoreWithAssignee) {
     setQuickPending(prev => new Set(prev).add(chore.id))
     startTransition(async () => {
       const result = await completeChore(chore.id)
-      if (!result?.error) {
-        removeFromLists(chore.id)
-        router.refresh()
-      }
+      if (!result?.error) { removeFromLists(chore.id); router.refresh() }
       setQuickPending(prev => { const s = new Set(prev); s.delete(chore.id); return s })
     })
   }
@@ -97,166 +113,190 @@ export default function DashboardClient({
     router.refresh()
   }
 
-  const totalToday  = overdueChores.length + todayChores.length
-  const hasPoints   = leaderboard.some(e => e.pointsAllTime > 0)
-
   return (
-    <div className="min-h-screen" style={{ background: 'var(--cs-bg)' }}>
-      {/* Nav */}
-      <header className="app-header">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold" style={{ color: 'var(--cs-muted)' }}>{householdName}</span>
-          <nav className="flex items-center gap-1 overflow-x-auto">
-            <NavLink href="/dashboard" label="Home"      active />
-            <NavLink href="/chores"    label="Chores"           />
-            <NavLink href="/calendar"  label="📅"               />
-            <NavLink href="/social"    label="💬"               />
-            <NavLink href="/history"   label="📊"               />
-            <NavLink href="/rewards"   label="🏆"               />
-            <NavLink href="/household" label="House"            />
-            <NavLink href="/settings"  label="⚙️"               />
-            <NavLink href="/profile"   label="Profile"          />
-          </nav>
-        </div>
-      </header>
+    <>
+      <style>{FONTS}</style>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-6 pb-24">
+      <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: '"Nunito", sans-serif', paddingBottom: 80 }}>
 
-        {/* Greeting */}
-        <section className="flex items-center gap-3">
-          <div
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white"
-            style={{ background: colorMap[currentUser.id] ?? '#6366f1' }}
-          >
-            {currentUser.avatar_url ? (
-              <Image src={currentUser.avatar_url} alt={currentUser.full_name ?? ''} width={44} height={44} className="h-full w-full object-cover" unoptimized />
-            ) : (
-              memberInitials(currentUser.full_name)
-            )}
+        {/* ── Top bar ──────────────────────────────────────────────────────── */}
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          background: '#fff', borderBottom: '1px solid #F0F0F0',
+          padding: '0 20px', height: 58,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10, background: '#FFD166',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+            }}>🧹</div>
+            <span style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 18, color: '#111827', letterSpacing: '-0.3px' }}>
+              ChoreSync
+            </span>
           </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight text-slate-900">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', background: '#F3F4F6', borderRadius: 99, padding: '4px 10px' }}>
+              {householdName}
+            </span>
+            <AvatarCircle user={currentUser} color={colorMap[currentUser.id]} size={32} />
+          </div>
+        </header>
+
+        {/* ── Scrollable content ────────────────────────────────────────────── */}
+        <main style={{ maxWidth: 500, margin: '0 auto', padding: '20px 16px 0' }}>
+
+          {/* Greeting */}
+          <section style={{ marginBottom: 22 }}>
+            <h1 style={{
+              fontFamily: '"Poppins", sans-serif', fontWeight: 800,
+              fontSize: 25, color: '#111827', margin: 0, letterSpacing: '-0.4px',
+            }}>
               {greeting(currentUser.full_name)}
             </h1>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-slate-500">
-                {totalToday === 0
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              <p style={{ margin: 0, fontSize: 14, color: '#6B7280' }}>
+                {totalPending === 0
                   ? "You're all caught up 🎉"
-                  : `${totalToday} chore${totalToday !== 1 ? 's' : ''} need${totalToday === 1 ? 's' : ''} your attention`}
+                  : `${totalPending} chore${totalPending !== 1 ? 's' : ''} need${totalPending === 1 ? 's' : ''} your attention`}
               </p>
               {myStreak && myStreak.current_streak >= 2 && (
-                <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">
+                <span style={{
+                  fontSize: 12, fontWeight: 700, color: '#EA580C',
+                  background: '#FFF7ED', borderRadius: 99, padding: '3px 10px',
+                  border: '1px solid #FED7AA',
+                }}>
                   🔥 {myStreak.current_streak}-day streak
                 </span>
               )}
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Pinned announcements */}
-        {visiblePins.length > 0 && (
-          <section className="space-y-2">
-            {visiblePins.map(ann => (
-              <div
-                key={ann.id}
-                className="relative flex gap-3 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 shadow-sm"
-              >
-                <span className="mt-0.5 flex-shrink-0 text-base">📌</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-indigo-600 mb-0.5">
-                    Pinned · {ann.author?.full_name ?? 'Admin'}
-                  </p>
-                  <p className="text-sm text-slate-700 leading-snug">{ann.content}</p>
+          {/* Pinned announcements */}
+          {visiblePins.length > 0 && (
+            <section style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {visiblePins.map(ann => (
+                <div key={ann.id} style={{
+                  background: '#EEF2FF', border: '1px solid #C7D2FE',
+                  borderRadius: 14, padding: '12px 14px',
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                }}>
+                  <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>📌</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      Pinned · {ann.author?.full_name ?? 'Admin'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.55 }}>{ann.content}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedPins(prev => new Set(prev).add(ann.id))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A5B4FC', padding: 2, flexShrink: 0, display: 'flex' }}
+                    aria-label="Dismiss"
+                  >
+                    <XIcon />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDismissedPins(prev => new Set(prev).add(ann.id))}
-                  className="flex-shrink-0 self-start rounded-full p-1 text-indigo-300 hover:bg-indigo-100 hover:text-indigo-600 transition"
-                  aria-label="Dismiss announcement"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {/* Weekly progress */}
-        <WeeklyProgress done={weekDone} total={totalActiveCount} />
-
-        {/* Leaderboard */}
-        {hasPoints && (
-          <Leaderboard
-            entries={leaderboard}
-            currentUserId={currentUser.id}
-            tab={leaderboardTab}
-            onTabChange={setLeaderboardTab}
-          />
-        )}
-
-        {/* Overdue */}
-        {overdueChores.length > 0 && (
-          <section>
-            <SectionHeader label="Overdue" count={overdueChores.length} accent="text-red-600" icon="⚠️" />
-            <div className="space-y-3">
-              {overdueChores.map(chore => (
-                <DashChoreCard
-                  key={chore.id}
-                  chore={chore}
-                  variant="overdue"
-                  isPending={quickPending.has(chore.id)}
-                  onComplete={() => setCompleteSheet(chore)}
-                  onQuickComplete={() => handleQuickComplete(chore)}
-                />
               ))}
-            </div>
-          </section>
-        )}
-
-        {/* Today */}
-        <section>
-          <SectionHeader label="Due Today" count={todayChores.length} accent="text-indigo-600" icon="📅" />
-          {todayChores.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-              <p className="text-2xl">✅</p>
-              <p className="mt-2 font-semibold text-slate-700">
-                {overdueChores.length > 0 ? 'No new chores today' : 'Nothing due today'}
-              </p>
-              <p className="mt-1 text-sm text-slate-400">
-                Check the{' '}
-                <a href="/chores" className="text-indigo-500 underline underline-offset-2">Chores tab</a>{' '}
-                to see upcoming tasks.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {todayChores.map(chore => (
-                <DashChoreCard
-                  key={chore.id}
-                  chore={chore}
-                  variant="today"
-                  isPending={quickPending.has(chore.id)}
-                  onComplete={() => setCompleteSheet(chore)}
-                  onQuickComplete={() => handleQuickComplete(chore)}
-                />
-              ))}
-            </div>
+            </section>
           )}
-        </section>
 
-        {/* Quick links */}
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick links</p>
-          <div className="grid grid-cols-4 gap-3">
-            <QuickLink href="/chores"    emoji="🧹" label="Chores"   />
-            <QuickLink href="/calendar"  emoji="📅" label="Calendar" />
-            <QuickLink href="/rewards"   emoji="🏆" label="Rewards"  />
-            <QuickLink href="/household" emoji="🏠" label="Household"/>
-          </div>
-        </section>
-      </main>
+          {/* ── Overdue ──────────────────────────────────────────────────────── */}
+          {overdueChores.length > 0 && (
+            <section style={{ marginBottom: 16 }}>
+              <SectionTitle icon="⚠️" label="Overdue" count={overdueChores.length} color="#EF4444" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {overdueChores.map(chore => (
+                  <ChoreCard
+                    key={chore.id}
+                    chore={chore}
+                    variant="overdue"
+                    pending={quickPending.has(chore.id)}
+                    onQuickComplete={() => handleQuickComplete(chore)}
+                    onDone={() => setCompleteSheet(chore)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Today ────────────────────────────────────────────────────────── */}
+          <section style={{ marginBottom: 20 }}>
+            <SectionTitle icon="📋" label="Due Today" count={todayChores.length} color="#FF6B2B" />
+            {todayChores.length === 0 ? (
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
+                padding: '32px 20px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>✅</div>
+                <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15, color: '#374151', margin: 0 }}>
+                  {overdueChores.length > 0 ? 'No new chores today' : 'Nothing due today'}
+                </p>
+                <p style={{ fontSize: 13, color: '#9CA3AF', margin: '6px 0 0' }}>
+                  Check the{' '}
+                  <a href="/chores" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Chores tab</a>
+                  {' '}for upcoming tasks
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {todayChores.map(chore => (
+                  <ChoreCard
+                    key={chore.id}
+                    chore={chore}
+                    variant="today"
+                    pending={quickPending.has(chore.id)}
+                    onQuickComplete={() => handleQuickComplete(chore)}
+                    onDone={() => setCompleteSheet(chore)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── Activity feed ─────────────────────────────────────────────────── */}
+          <section style={{ marginBottom: 24 }}>
+            <SectionTitle icon="📡" label="Recent Activity" color="#6B7280" />
+            {recentActivity.length === 0 ? (
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
+                padding: '28px 20px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🏡</div>
+                <p style={{ fontSize: 14, color: '#9CA3AF', margin: 0 }}>
+                  No activity yet — start completing chores!
+                </p>
+              </div>
+            ) : (
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                {recentActivity.map((item, i) => (
+                  <ActivityRow
+                    key={item.id}
+                    item={item}
+                    isLast={i === recentActivity.length - 1}
+                    isMe={item.member?.id === currentUser.id}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+
+        {/* ── Bottom nav ────────────────────────────────────────────────────── */}
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+          background: '#fff', borderTop: '1px solid #F0F0F0',
+          display: 'flex', alignItems: 'center',
+          height: 68, padding: '0 8px 6px',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+        }}>
+          <BottomNavItem href="/dashboard" label="Home"     icon={<HomeIcon />}     active />
+          <BottomNavItem href="/chores"    label="Chores"   icon={<ChoresIcon />}         />
+          <BottomNavItem href="/calendar"  label="Calendar" icon={<CalendarIcon />}       />
+          <BottomNavItem href="/social"    label="Chat"     icon={<ChatIcon />}           />
+          <BottomNavItem href="/profile"   label="Profile"  icon={<ProfileIcon />}        />
+        </nav>
+      </div>
 
       {completeSheet && (
         <CompleteChoreSheet
@@ -265,251 +305,357 @@ export default function DashboardClient({
           onDone={handleSheetDone}
         />
       )}
-    </div>
+    </>
   )
 }
 
-// ── Leaderboard widget ────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Leaderboard({
-  entries,
-  currentUserId,
-  tab,
-  onTabChange,
-}: {
-  entries:       LeaderboardEntry[]
-  currentUserId: string
-  tab:           'week' | 'alltime'
-  onTabChange:   (t: 'week' | 'alltime') => void
+function SectionTitle({ icon, label, count, color }: {
+  icon:   string
+  label:  string
+  count?: number
+  color:  string
 }) {
-  const sorted = [...entries].sort((a, b) =>
-    tab === 'week'
-      ? b.pointsThisWeek - a.pointsThisWeek
-      : b.pointsAllTime  - a.pointsAllTime
-  )
-
-  const topScore = sorted[0]?.[tab === 'week' ? 'pointsThisWeek' : 'pointsAllTime'] ?? 0
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🏆</span>
-          <p className="font-semibold text-slate-900">Leaderboard</p>
-        </div>
-        <div className="flex rounded-lg border border-slate-200 p-0.5">
-          {(['week', 'alltime'] as const).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onTabChange(t)}
-              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                tab === t ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {t === 'week' ? 'This week' : 'All time'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Rows */}
-      <div className="divide-y divide-slate-50">
-        {sorted.slice(0, 5).map((entry, idx) => {
-          const pts = tab === 'week' ? entry.pointsThisWeek : entry.pointsAllTime
-          const isMe = entry.userId === currentUserId
-          const pct  = topScore > 0 ? (pts / topScore) * 100 : 0
-          const medals = ['🥇', '🥈', '🥉']
-
-          return (
-            <div key={entry.userId} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-indigo-50/60' : ''}`}>
-              {/* Rank */}
-              <span className="w-6 text-center text-sm">
-                {idx < 3 ? medals[idx] : <span className="font-semibold text-slate-400">{idx + 1}</span>}
-              </span>
-
-              {/* Avatar */}
-              <div
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
-                style={{ background: entry.color }}
-              >
-                {entry.avatarUrl ? (
-                  <Image src={entry.avatarUrl} alt={entry.name ?? ''} width={32} height={32} className="h-full w-full object-cover" unoptimized />
-                ) : (
-                  memberInitials(entry.name)
-                )}
-              </div>
-
-              {/* Name + bar */}
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold leading-none ${isMe ? 'text-indigo-700' : 'text-slate-900'}`}>
-                  {isMe ? 'You' : (entry.name ?? 'Unknown')}
-                </p>
-                {topScore > 0 && (
-                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, background: entry.color }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Points */}
-              <div className="text-right flex-shrink-0">
-                <span className={`text-sm font-bold ${pts > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
-                  {pts}
-                </span>
-                <span className="ml-0.5 text-xs text-slate-400">pts</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {sorted.every(e => (tab === 'week' ? e.pointsThisWeek : e.pointsAllTime) === 0) && (
-        <p className="px-4 py-4 text-center text-sm text-slate-400">
-          No points earned {tab === 'week' ? 'this week' : 'yet'}. Complete chores to score!
-        </p>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+      <span style={{ fontSize: 14 }}>{icon}</span>
+      <h2 style={{
+        fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 12,
+        color, textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0,
+      }}>
+        {label}
+      </h2>
+      {count !== undefined && count > 0 && (
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: '#9CA3AF',
+          background: '#F3F4F6', borderRadius: 99, padding: '1px 8px',
+        }}>
+          {count}
+        </span>
       )}
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function WeeklyProgress({ done, total }: { done: number; total: number }) {
-  const pct = total === 0 ? 0 : Math.min(100, Math.round((done / total) * 100))
-  const allDone = done >= total && total > 0
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-700">This week</p>
-        <p className="text-sm font-bold text-slate-900">
-          {done} <span className="font-normal text-slate-400">of {total} done</span>
-        </p>
-      </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            allDone ? 'bg-emerald-500' : pct >= 75 ? 'bg-indigo-500' : pct >= 40 ? 'bg-amber-400' : 'bg-slate-300'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      {allDone && (
-        <p className="mt-2 text-xs font-semibold text-emerald-600">All chores complete this week! 🎉</p>
-      )}
-    </div>
-  )
+const PRIORITY_BAR: Record<string, string> = {
+  low:    '#10B981',
+  medium: '#F59E0B',
+  high:   '#EF4444',
 }
 
-function SectionHeader({ label, count, accent, icon }: { label: string; count: number; accent: string; icon: string }) {
-  return (
-    <div className="mb-3 flex items-center gap-2">
-      <span className="text-base leading-none">{icon}</span>
-      <h2 className={`text-sm font-bold uppercase tracking-wide ${accent}`}>{label}</h2>
-      {count > 0 && (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">{count}</span>
-      )}
-    </div>
-  )
-}
-
-const PRIORITY_DOT: Record<string, string> = {
-  low:    'bg-emerald-400',
-  medium: 'bg-amber-400',
-  high:   'bg-red-500',
-}
-
-function DashChoreCard({ chore, variant, isPending, onComplete, onQuickComplete }: {
+function ChoreCard({ chore, variant, pending, onQuickComplete, onDone }: {
   chore:           ChoreWithAssignee
   variant:         'overdue' | 'today'
-  isPending:       boolean
-  onComplete:      () => void
+  pending:         boolean
   onQuickComplete: () => void
+  onDone:          () => void
 }) {
-  const catMeta   = CATEGORY_META[chore.category]
+  const catMeta     = CATEGORY_META[chore.category]
   const isRecurring = chore.frequency !== 'one-time'
+  const barColor    = PRIORITY_BAR[chore.priority] ?? '#9CA3AF'
+  const isOverdue   = variant === 'overdue'
 
   return (
-    <div className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition
-      ${variant === 'overdue' ? 'border-red-200 bg-red-50/30' : 'border-slate-200'}`}>
-      <div className={`absolute left-0 top-0 h-full w-1 ${PRIORITY_DOT[chore.priority]}`} />
+    <div style={{
+      background:   isOverdue ? '#FFF9F9' : '#fff',
+      borderRadius: 16,
+      border:       `1px solid ${isOverdue ? '#FECACA' : '#F0F0F0'}`,
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '14px 14px 14px 0',
+      position: 'relative', overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+    }}>
+      {/* Priority stripe */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: barColor }} />
 
+      {/* Circle complete button */}
       <button
         type="button"
         onClick={onQuickComplete}
-        disabled={isPending}
-        aria-label="Mark as complete"
-        className={`ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 transition
-          ${variant === 'overdue' ? 'border-red-400 hover:border-red-500 hover:bg-red-50' : 'border-slate-300 hover:border-indigo-500 hover:bg-indigo-50'}
-          disabled:opacity-50`}
+        disabled={pending}
+        aria-label="Mark done"
+        style={{
+          marginLeft: 14, flexShrink: 0,
+          width: 28, height: 28, borderRadius: '50%',
+          border: `2px solid ${isOverdue ? '#FCA5A5' : '#D1D5DB'}`,
+          background: 'transparent', cursor: pending ? 'wait' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 0, transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.borderColor = '#FF6B2B'
+          b.style.background  = '#FFF3EE'
+        }}
+        onMouseLeave={e => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.borderColor = isOverdue ? '#FCA5A5' : '#D1D5DB'
+          b.style.background  = 'transparent'
+        }}
       >
-        {isPending && <Spinner className="h-3.5 w-3.5 text-slate-400" />}
+        {pending ? <SpinSVG /> : <CheckSVG />}
       </button>
 
-      <div className="flex flex-1 flex-col gap-1 min-w-0">
-        <div className="flex items-start gap-2">
-          <span className="text-lg leading-none flex-shrink-0">{catMeta.emoji}</span>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold leading-snug text-slate-900 truncate">{chore.name}</p>
-            {chore.description && <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{chore.description}</p>}
-          </div>
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{catMeta.emoji}</span>
+          <p style={{
+            fontFamily: '"Poppins", sans-serif', fontWeight: 600,
+            fontSize: 14, color: '#111827', margin: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {chore.name}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {chore.description && (
+          <p style={{ fontSize: 12, color: '#9CA3AF', margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {chore.description}
+          </p>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
           {chore.points > 0 && (
-            <span className="rounded-full bg-yellow-50 px-2 py-0.5 font-semibold text-yellow-700">🏆 {chore.points} pts</span>
+            <Chip bg="#FFFBEB" color="#B45309">🏆 {chore.points} pts</Chip>
           )}
-          {variant === 'overdue' && chore.due_date && (
-            <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-600">
-              Overdue · {formatDue(chore.due_date)}
-            </span>
+          {isOverdue && chore.due_date && (
+            <Chip bg="#FEF2F2" color="#DC2626">Overdue · {formatDue(chore.due_date)}</Chip>
           )}
           {isRecurring && (
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-600">🔁 {chore.frequency}</span>
+            <Chip bg="#EEF2FF" color="#4338CA">🔁 {chore.frequency}</Chip>
           )}
-          {chore.estimated_mins && <span className="text-slate-400">⏱ {chore.estimated_mins} min</span>}
+          {!!chore.estimated_mins && (
+            <Chip bg="#F9FAFB" color="#6B7280">⏱ {chore.estimated_mins}m</Chip>
+          )}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onComplete}
-        className="flex-shrink-0 rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-emerald-600 active:scale-95"
-      >
-        Done
-      </button>
+      {/* Done button */}
+      <DoneButton onClick={onDone} />
     </div>
   )
 }
 
-function NavLink({ href, label, active = false }: { href: string; label: string; active?: boolean }) {
+function DoneButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
   return (
-    <a href={href} className={`nav-link${active ? ' active' : ''}`}>
-      {label}
-    </a>
-  )
-}
-
-function QuickLink({ href, emoji, label }: { href: string; emoji: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white py-4 text-center shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 active:scale-95"
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false) }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      style={{
+        flexShrink: 0,
+        borderRadius: 12,
+        background: hovered ? '#e85a1f' : '#FF6B2B',
+        color: '#fff', border: 'none',
+        fontSize: 13, fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+        padding: '9px 16px', cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(255,107,43,0.3)',
+        transform: pressed ? 'scale(0.95)' : 'scale(1)',
+        transition: 'background 0.15s, transform 0.1s',
+      }}
     >
-      <span className="text-2xl leading-none">{emoji}</span>
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      Done
+    </button>
+  )
+}
+
+function ActivityRow({ item, isLast, isMe }: { item: ActivityEntry; isLast: boolean; isMe: boolean }) {
+  const catMeta     = (CATEGORY_META as Record<string, { emoji: string }>)[item.category] ?? { emoji: '🧹' }
+  const displayName = isMe ? 'You' : (item.member?.name?.split(' ')[0] ?? 'Someone')
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '13px 16px',
+      borderBottom: isLast ? 'none' : '1px solid #F7F8FA',
+    }}>
+      {/* Member avatar */}
+      <div style={{
+        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+        background: item.member?.color ?? '#E5E7EB',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 13, fontWeight: 700, color: '#fff',
+        overflow: 'hidden',
+      }}>
+        {item.member?.avatarUrl ? (
+          <Image
+            src={item.member.avatarUrl}
+            alt={item.member.name ?? ''}
+            width={38} height={38}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            unoptimized
+          />
+        ) : (
+          initials(item.member?.name ?? null)
+        )}
+      </div>
+
+      {/* Text */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.45 }}>
+          <span style={{ fontWeight: 800, color: isMe ? '#FF6B2B' : '#111827' }}>
+            {displayName}
+          </span>
+          {' '}completed{' '}
+          <span style={{ fontWeight: 700 }}>{catMeta.emoji} {item.choreName}</span>
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{timeAgo(item.completedAt)}</span>
+          {item.points > 0 && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: '#B45309',
+              background: '#FFFBEB', borderRadius: 99, padding: '1px 7px',
+            }}>
+              +{item.points} pts
+            </span>
+          )}
+          {item.wasOnTime === false && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444' }}>late</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AvatarCircle({ user, color, size }: { user: UserRow; color?: string; size: number }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: color ?? '#6366F1', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.35, fontWeight: 700, color: '#fff',
+      overflow: 'hidden',
+    }}>
+      {user.avatar_url ? (
+        <Image
+          src={user.avatar_url} alt={user.full_name ?? ''}
+          width={size} height={size}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          unoptimized
+        />
+      ) : (
+        initials(user.full_name)
+      )}
+    </div>
+  )
+}
+
+function Chip({ children, bg, color }: { children: React.ReactNode; bg: string; color: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      fontSize: 11, fontWeight: 700, borderRadius: 99,
+      padding: '2px 8px', background: bg, color,
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function BottomNavItem({ href, label, icon, active }: {
+  href:   string
+  label:  string
+  icon:   React.ReactNode
+  active?: boolean
+}) {
+  return (
+    <a href={href} style={{
+      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: 3, textDecoration: 'none',
+      color: active ? '#FF6B2B' : '#9CA3AF',
+      padding: '4px 0',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </div>
+      <span style={{
+        fontSize: 10, fontFamily: '"Nunito", sans-serif',
+        fontWeight: active ? 800 : 600,
+        letterSpacing: '0.01em',
+      }}>
+        {label}
+      </span>
     </a>
   )
 }
 
-function Spinner({ className = '' }: { className?: string }) {
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+
+const IC = { width: 22, height: 22, fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+
+function HomeIcon() {
   return (
-    <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24" aria-hidden>
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+    <svg {...IC} viewBox="0 0 24 24">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   )
 }
+function ChoresIcon() {
+  return (
+    <svg {...IC} viewBox="0 0 24 24">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    </svg>
+  )
+}
+function CalendarIcon() {
+  return (
+    <svg {...IC} viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8"  y1="2" x2="8"  y2="6" />
+      <line x1="3"  y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+function ChatIcon() {
+  return (
+    <svg {...IC} viewBox="0 0 24 24">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    </svg>
+  )
+}
+function ProfileIcon() {
+  return (
+    <svg {...IC} viewBox="0 0 24 24">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+}
+function XIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  )
+}
+function CheckSVG() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+function SpinSVG() {
+  return (
+    <svg style={{ width: 13, height: 13, animation: 'cs-spin 0.8s linear infinite' }} viewBox="0 0 24 24" fill="none">
+      <style>{`@keyframes cs-spin { to { transform: rotate(360deg) } }`}</style>
+      <circle cx="12" cy="12" r="10" stroke="#D1D5DB" strokeWidth="3" strokeOpacity="0.3" />
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="#9CA3AF" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ─── Font import ──────────────────────────────────────────────────────────────
+
+const FONTS = `
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito:wght@400;500;600;700;800&display=swap');
+`
