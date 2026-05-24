@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
@@ -15,11 +14,37 @@ import type {
 export const metadata: Metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
 
+// Shown when there is no active session (dev / unauthenticated mode)
+const MOCK_USER: UserRow = {
+  id:         'dev',
+  email:      'dev@choresync.app',
+  full_name:  'Alex Johnson',
+  avatar_url: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+
+  // No session — render an empty but fully functional dashboard shell
+  if (!user) {
+    return (
+      <DashboardClient
+        currentUser={MOCK_USER}
+        myOverdueChores={[]}
+        myTodayChores={[]}
+        householdName="My Household"
+        householdId="dev"
+        colorMap={{ dev: '#FF6B2B' }}
+        myStreak={null}
+        pinnedAnnouncements={[]}
+        recentActivity={[]}
+      />
+    )
+  }
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([
@@ -28,7 +53,22 @@ export default async function DashboardPage() {
   ])
   const profile = profileRaw as UserRow | null
 
-  if (!membership) redirect('/onboarding')
+  // No household yet — render empty dashboard rather than redirecting to onboarding
+  if (!membership) {
+    return (
+      <DashboardClient
+        currentUser={profile as UserRow}
+        myOverdueChores={[]}
+        myTodayChores={[]}
+        householdName="My Household"
+        householdId=""
+        colorMap={{ [user.id]: '#FF6B2B' }}
+        myStreak={null}
+        pinnedAnnouncements={[]}
+        recentActivity={[]}
+      />
+    )
+  }
 
   const { household_id: householdId } = membership
 
