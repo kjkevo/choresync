@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { CATEGORY_META, PRIORITY_META, FREQUENCY_OPTIONS } from './ChoreModal'
 import type { ChoreWithAssignee } from '@/lib/types/database'
+import { parseSubtasks } from '@/lib/types/database'
 
 // ── Color helpers ────────────────────────────────────────────────────────────
 
@@ -220,8 +221,7 @@ export default function ChoreCard({
 
           {/* Subtask progress */}
           {(() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const subs = Array.isArray((chore as any).subtasks) ? (chore as any).subtasks as { id: string; completed: boolean }[] : []
+            const subs = parseSubtasks(chore.subtasks)
             if (subs.length === 0) return null
             const doneCount = subs.filter(s => s.completed).length
             return (

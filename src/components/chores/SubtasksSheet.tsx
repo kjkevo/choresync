@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toggleSubtask } from '@/lib/actions/chores'
 import type { ChoreWithAssignee, SubtaskItem } from '@/lib/types/database'
+import { parseSubtasks } from '@/lib/types/database'
 
 interface Props {
   chore:     ChoreWithAssignee
@@ -11,9 +12,7 @@ interface Props {
 }
 
 export default function SubtasksSheet({ chore, onClose, onUpdated }: Props) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = Array.isArray((chore as any).subtasks) ? (chore as any).subtasks as SubtaskItem[] : []
-  const [items, setItems] = useState<SubtaskItem[]>(raw)
+  const [items, setItems] = useState<SubtaskItem[]>(parseSubtasks(chore.subtasks))
   const [, startTransition] = useTransition()
 
   function toggle(item: SubtaskItem) {

@@ -85,13 +85,10 @@ export default function ChoreModal({
   const [rotationEnabled, setRotationEnabled] = useState(chore?.rotation_enabled ?? false)
   const [rotationMembers, setRotationMembers] = useState<string[]>(existingMembers)
 
-  // Subtasks
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const existingSubtasks = Array.isArray((chore as any)?.subtasks)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (chore as any).subtasks as { id: string; title: string; completed: boolean }[]
-    : []
-  const [subtasks,      setSubtasks]      = useState(existingSubtasks)
+  // Subtasks — ChoreRow.subtasks is typed as Json; cast to the actual shape
+  type SubtaskDraft = { id: string; title: string; completed: boolean }
+  const existingSubtasks = (chore?.subtasks as SubtaskDraft[] | null) ?? []
+  const [subtasks,      setSubtasks]      = useState<SubtaskDraft[]>(existingSubtasks)
   const [newSubtaskText, setNewSubtaskText] = useState('')
 
   // Form state

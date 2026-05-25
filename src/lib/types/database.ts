@@ -429,6 +429,16 @@ export interface ChoreWithAssignee extends ChoreRow {
   assignee: UserRow | null
 }
 
+/** Safely cast ChoreRow.subtasks (Json) to the typed array at runtime. */
+export function parseSubtasks(json: Json): SubtaskItem[] {
+  if (!Array.isArray(json)) return []
+  return (json as unknown[]).filter((x): x is SubtaskItem =>
+    typeof x === 'object' && x !== null && !Array.isArray(x) &&
+    typeof (x as Record<string, unknown>).id === 'string' &&
+    typeof (x as Record<string, unknown>).title === 'string'
+  )
+}
+
 /** Swap request enriched with chore name and requester profile */
 export interface SwapRequestWithDetails extends SwapRequestRow {
   chore:     { id: string; name: string } | null

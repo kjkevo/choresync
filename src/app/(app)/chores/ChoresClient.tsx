@@ -355,8 +355,10 @@ export default function ChoresClient({
           chore={subtasksChore}
           onClose={() => setSubtasksChore(null)}
           onUpdated={(choreId, newSubtasks) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setChores(prev => prev.map(c => c.id === choreId ? { ...c, subtasks: newSubtasks as any } : c))
+            setChores(prev => prev.map(c => c.id === choreId
+              ? { ...c, subtasks: newSubtasks as unknown as import('@/lib/types/database').Json }
+              : c
+            ))
           }}
         />
       )}
