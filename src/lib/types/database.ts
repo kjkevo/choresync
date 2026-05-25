@@ -385,6 +385,86 @@ export interface Database {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          id:           string
+          user_id:      string
+          household_id: string
+          endpoint:     string
+          p256dh:       string
+          auth:         string
+          created_at:   string
+        }
+        Insert: {
+          id?:          string
+          user_id:      string
+          household_id: string
+          endpoint:     string
+          p256dh:       string
+          auth:         string
+          created_at?:  string
+        }
+        Update: {
+          endpoint?:    string
+          p256dh?:      string
+          auth?:        string
+        }
+        Relationships: []
+      }
+      user_notification_prefs: {
+        Row: {
+          id:              string
+          user_id:         string
+          household_id:    string
+          notify_due:      boolean
+          notify_overdue:  boolean
+          notify_assigned: boolean
+          notify_nudge:    boolean
+          quiet_start:     string | null
+          quiet_end:       string | null
+          updated_at:      string
+        }
+        Insert: {
+          id?:             string
+          user_id:         string
+          household_id:    string
+          notify_due?:     boolean
+          notify_overdue?: boolean
+          notify_assigned?: boolean
+          notify_nudge?:   boolean
+          quiet_start?:    string | null
+          quiet_end?:      string | null
+          updated_at?:     string
+        }
+        Update: {
+          notify_due?:     boolean
+          notify_overdue?: boolean
+          notify_assigned?: boolean
+          notify_nudge?:   boolean
+          quiet_start?:    string | null
+          quiet_end?:      string | null
+          updated_at?:     string
+        }
+        Relationships: []
+      }
+      nudge_log: {
+        Row: {
+          id:          string
+          chore_id:    string
+          sender_id:   string
+          receiver_id: string
+          sent_at:     string
+        }
+        Insert: {
+          id?:         string
+          chore_id:    string
+          sender_id:   string
+          receiver_id: string
+          sent_at?:    string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {

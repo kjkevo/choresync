@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { useState } from 'react'
 import { CATEGORY_META, PRIORITY_META, FREQUENCY_OPTIONS } from './ChoreModal'
 import type { ChoreWithAssignee } from '@/lib/types/database'
 import { parseSubtasks } from '@/lib/types/database'
@@ -85,6 +86,7 @@ interface ChoreCardProps {
   onManualReassign?: (chore: ChoreWithAssignee) => void   // admin: override assignee
   onNotes?:          (chore: ChoreWithAssignee) => void   // open comments sheet
   onSubtasks?:       (chore: ChoreWithAssignee) => void
+  onNudge?:          (chore: ChoreWithAssignee) => Promise<{ error?: string }> // nudge assignee
 }
 
 export default function ChoreCard({
@@ -102,6 +104,7 @@ export default function ChoreCard({
   onManualReassign,
   onNotes,
   onSubtasks,
+  onNudge,
 }: ChoreCardProps) {
   const overdue   = isOverdue(chore.due_date, chore.status)
   const dueToday  = isDueToday(chore.due_date)
@@ -116,6 +119,11 @@ export default function ChoreCard({
   const isRotating   = chore.rotation_enabled
   const showSwap     = isRotating && isMyChore && !done && !isAdmin && !!onSwapRequest
   const showOverride = isRotating && isAdmin && !done && !!onManualReassign
+
+  // Nudge: show for overdue chores assigned to *someone else*
+  const showNudge  = overdue && !!onNudge && !!chore.assigned_to && chore.assigned_to !== currentUserId && !done
+  const [nudging,      setNudging]      = useState(false)
+  const [nudgeResult,  setNudgeResult]  = useState<'sent' | 'err' | null>(null)
 
   return (
     <article
@@ -275,6 +283,31 @@ export default function ChoreCard({
           )}
 
           <div className="flex items-center gap-1">
+            {/* Nudge button — overdue chores assigned to someone else */}
+            {showNudge && (
+              <button
+                type="button"
+                disabled={nudging || nudgeResult === 'sent'}
+                onClick={async () => {
+                  setNudging(true)
+                  const res = await onNudge!(chore)
+                  setNudging(false)
+                  setNudgeResult(res.error ? 'err' : 'sent')
+                  setTimeout(() => setNudgeResult(null), 3000)
+                }}
+                className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${
+                  nudgeResult === 'sent'
+                    ? 'text-emerald-600 bg-emerald-50'
+                    : nudgeResult === 'err'
+                    ? 'text-red-500 bg-red-50'
+                    : 'text-orange-500 hover:bg-orange-50'
+                }`}
+                title="Send a friendly nudge"
+              >
+                {nudging ? '…' : nudgeResult === 'sent' ? '✓ Nudged!' : nudgeResult === 'err' ? '✗ Error' : '👋 Nudge'}
+              </button>
+            )}
+
             {/* Non-admin swap request button */}
             {showSwap && (
               <button

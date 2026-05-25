@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useTheme } from '@/lib/contexts/ThemeContext'
 import {
   updateHouseholdSettings,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/settings'
 import { updateHouseholdName, leaveHousehold } from '@/lib/actions/household'
 import type { HouseholdSettings, UserRow } from '@/lib/types/database'
+import { usePushSubscription } from '@/lib/hooks/usePushSubscription'
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
@@ -57,26 +58,23 @@ const SECTIONS = [
 
 type SectionId = typeof SECTIONS[number]['id']
 
-// ── Notification types ────────────────────────────────────────────────────────
+// ── Notification prefs (server-persisted) ─────────────────────────────────────
 
-interface NotifPrefs {
-  dueChoresPush:    boolean
-  dueChoresEmail:   boolean
-  dailyDigestPush:  boolean
-  dailyDigestEmail: boolean
-  overdueAlertPush: boolean
-  overdueAlertEmail:boolean
+interface DbNotifPrefs {
+  notify_due:      boolean
+  notify_overdue:  boolean
+  notify_assigned: boolean
+  notify_nudge:    boolean
+  quiet_start:     string | null
+  quiet_end:       string | null
 }
-const DEFAULT_NOTIF_PREFS: NotifPrefs = {
-  dueChoresPush:    true,  dueChoresEmail:    false,
-  dailyDigestPush:  false, dailyDigestEmail:  true,
-  overdueAlertPush: true,  overdueAlertEmail: true,
-}
-function loadNotifPrefs(): NotifPrefs {
-  try {
-    const s = localStorage.getItem('cs-notif-prefs')
-    return s ? { ...DEFAULT_NOTIF_PREFS, ...JSON.parse(s) } : DEFAULT_NOTIF_PREFS
-  } catch { return DEFAULT_NOTIF_PREFS }
+const DEFAULT_DB_NOTIF_PREFS: DbNotifPrefs = {
+  notify_due:      true,
+  notify_overdue:  true,
+  notify_assigned: true,
+  notify_nudge:    true,
+  quiet_start:     null,
+  quiet_end:       null,
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -190,15 +188,75 @@ export default function SettingsClient({
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────
-  const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS)
-  useEffect(() => { setNotifPrefs(loadNotifPrefs()) }, [])
+  const { status: pushStatus, loading: pushLoading, subscribe, unsubscribe } = usePushSubscription(householdId)
 
-  function toggleNotif(key: keyof NotifPrefs) {
-    setNotifPrefs(prev => {
-      const next = { ...prev, [key]: !prev[key] }
-      try { localStorage.setItem('cs-notif-prefs', JSON.stringify(next)) } catch {}
-      return next
-    })
+  const [dbPrefs, setDbPrefs]           = useState<DbNotifPrefs>(DEFAULT_DB_NOTIF_PREFS)
+  const [prefsLoaded, setPrefsLoaded]   = useState(false)
+  const [prefsSaving, setPrefsSaving]   = useState(false)
+  const [prefsMsg, setPrefsMsg]         = useState<{ type: 'ok'|'err'; text: string } | null>(null)
+  const [pushMsg, setPushMsg]           = useState<{ type: 'ok'|'err'; text: string } | null>(null)
+
+  // Load prefs from server on mount
+  useEffect(() => {
+    if (!householdId) return
+    fetch(`/api/push/prefs?householdId=${householdId}`)
+      .then(r => r.json())
+      .then(({ prefs }) => {
+        if (prefs) setDbPrefs({ ...DEFAULT_DB_NOTIF_PREFS, ...prefs })
+        setPrefsLoaded(true)
+      })
+      .catch(() => setPrefsLoaded(true))
+  }, [householdId])
+
+  const savePrefs = useCallback(async (next: DbNotifPrefs) => {
+    setPrefsSaving(true)
+    setPrefsMsg(null)
+    try {
+      const res = await fetch('/api/push/prefs', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ householdId, ...next }),
+      })
+      if (res.ok) {
+        setPrefsMsg({ type: 'ok', text: 'Preferences saved!' })
+      } else {
+        const { error } = await res.json()
+        setPrefsMsg({ type: 'err', text: error ?? 'Save failed' })
+      }
+    } catch {
+      setPrefsMsg({ type: 'err', text: 'Network error' })
+    } finally {
+      setPrefsSaving(false)
+      setTimeout(() => setPrefsMsg(null), 3000)
+    }
+  }, [householdId])
+
+  function toggleDbPref(key: keyof Pick<DbNotifPrefs, 'notify_due'|'notify_overdue'|'notify_assigned'|'notify_nudge'>) {
+    const next = { ...dbPrefs, [key]: !dbPrefs[key] }
+    setDbPrefs(next)
+    savePrefs(next)
+  }
+
+  async function handlePushToggle() {
+    if (pushStatus === 'subscribed') {
+      const { error } = await unsubscribe()
+      if (error) setPushMsg({ type: 'err', text: error })
+      else setPushMsg({ type: 'ok', text: 'Push notifications disabled.' })
+    } else {
+      const { error } = await subscribe()
+      if (error) setPushMsg({ type: 'err', text: error })
+      else setPushMsg({ type: 'ok', text: 'Push notifications enabled!' })
+    }
+    setTimeout(() => setPushMsg(null), 4000)
+  }
+
+  function handleQuietChange(field: 'quiet_start' | 'quiet_end', value: string) {
+    const next = { ...dbPrefs, [field]: value || null }
+    setDbPrefs(next)
+  }
+
+  function handleQuietBlur() {
+    savePrefs(dbPrefs)
   }
 
   // ── Leave household modal ──────────────────────────────────────────────────
@@ -561,51 +619,158 @@ export default function SettingsClient({
             <section id="notifications" className="scroll-mt-24 space-y-4">
               <h2 className="section-title">🔔 Notifications</h2>
 
+              {/* ── Push enable / disable card ─────────────────────── */}
+              <div className="card space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold">Push Notifications</h3>
+                    <p className="mt-0.5 text-sm" style={{ color: 'var(--cs-muted)' }}>
+                      {pushStatus === 'unsupported'
+                        ? 'Your browser does not support push notifications.'
+                        : pushStatus === 'denied'
+                        ? 'Notifications are blocked. Enable them in your browser settings.'
+                        : pushStatus === 'subscribed'
+                        ? 'You are receiving push notifications on this device.'
+                        : 'Enable push notifications to get chore reminders and nudges.'}
+                    </p>
+                  </div>
+                  {pushStatus !== 'unsupported' && pushStatus !== 'denied' && (
+                    <button
+                      type="button"
+                      onClick={handlePushToggle}
+                      disabled={pushLoading}
+                      className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        pushStatus === 'subscribed'
+                          ? 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      }`}
+                    >
+                      {pushLoading ? <Spinner /> : pushStatus === 'subscribed' ? 'Turn off' : 'Enable'}
+                    </button>
+                  )}
+                </div>
+
+                {pushMsg && (
+                  <div className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                    pushMsg.type === 'ok'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                      : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                  }`}>
+                    {pushMsg.text}
+                  </div>
+                )}
+
+                {pushStatus === 'denied' && (
+                  <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                    To re-enable notifications, click the lock icon in your browser's address bar and set Notifications to &quot;Allow&quot;.
+                  </div>
+                )}
+              </div>
+
+              {/* ── Per-type preferences ───────────────────────────── */}
               <div className="card space-y-5">
                 <div>
-                  <h3 className="font-semibold">Notification Preferences</h3>
+                  <h3 className="font-semibold">Alert Types</h3>
                   <p className="mt-0.5 text-sm" style={{ color: 'var(--cs-muted)' }}>
-                    Control which alerts you receive and via which channel.
+                    Choose which events trigger a push notification.
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  {[
-                    {
-                      label:       'Due Chores',
-                      description: 'Get notified when one of your chores is due today.',
-                      pushKey:     'dueChoresPush'  as const,
-                      emailKey:    'dueChoresEmail' as const,
-                    },
-                    {
-                      label:       'Daily Digest',
-                      description: 'Morning summary of your pending and upcoming chores.',
-                      pushKey:     'dailyDigestPush'  as const,
-                      emailKey:    'dailyDigestEmail' as const,
-                    },
-                    {
-                      label:       'Overdue Alerts',
-                      description: 'Alert when a chore passes its due date uncompleted.',
-                      pushKey:     'overdueAlertPush'  as const,
-                      emailKey:    'overdueAlertEmail' as const,
-                    },
-                  ].map(row => (
-                    <NotifRow
-                      key={row.label}
-                      label={row.label}
-                      description={row.description}
-                      pushEnabled={notifPrefs[row.pushKey]}
-                      emailEnabled={notifPrefs[row.emailKey]}
-                      onTogglePush={() => toggleNotif(row.pushKey)}
-                      onToggleEmail={() => toggleNotif(row.emailKey)}
-                    />
-                  ))}
+                {!prefsLoaded ? (
+                  <div className="flex justify-center py-4"><Spinner /></div>
+                ) : (
+                  <div className="space-y-3">
+                    {([
+                      { key: 'notify_due'      as const, label: 'Due today',        description: 'Notified when your chore is due today.' },
+                      { key: 'notify_overdue'  as const, label: 'Overdue alert',    description: 'Notified when a chore passes its due date.' },
+                      { key: 'notify_assigned' as const, label: 'Newly assigned',   description: 'Notified when a chore is assigned to you.' },
+                      { key: 'notify_nudge'    as const, label: 'Roommate nudges',  description: 'Receive friendly pings from your housemates.' },
+                    ]).map(row => (
+                      <div key={row.key} className="flex items-center justify-between gap-4 rounded-xl px-4 py-3"
+                        style={{ background: 'var(--cs-inset)', border: '1px solid var(--cs-border)' }}>
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--cs-text)' }}>{row.label}</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--cs-muted)' }}>{row.description}</p>
+                        </div>
+                        <Toggle
+                          checked={dbPrefs[row.key]}
+                          onChange={() => toggleDbPref(row.key)}
+                          label=""
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {prefsMsg && (
+                  <div className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                    prefsMsg.type === 'ok'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                      : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                  }`}>
+                    {prefsSaving ? 'Saving…' : prefsMsg.text}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Quiet hours ────────────────────────────────────── */}
+              <div className="card space-y-4">
+                <div>
+                  <h3 className="font-semibold">🌙 Quiet Hours</h3>
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--cs-muted)' }}>
+                    Silence all notifications during these hours (your local time zone is used in UTC — adjust accordingly).
+                  </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-                  💡 Push and email notifications require your browser permission and a valid email address.
-                  Preferences are saved locally.
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--cs-muted)' }}>
+                      Start time
+                    </label>
+                    <input
+                      type="time"
+                      value={dbPrefs.quiet_start ?? ''}
+                      onChange={e => handleQuietChange('quiet_start', e.target.value)}
+                      onBlur={handleQuietBlur}
+                      className="w-full rounded-xl border px-3 py-2 text-sm"
+                      style={{ background: 'var(--cs-inset)', borderColor: 'var(--cs-border)', color: 'var(--cs-text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--cs-muted)' }}>
+                      End time
+                    </label>
+                    <input
+                      type="time"
+                      value={dbPrefs.quiet_end ?? ''}
+                      onChange={e => handleQuietChange('quiet_end', e.target.value)}
+                      onBlur={handleQuietBlur}
+                      className="w-full rounded-xl border px-3 py-2 text-sm"
+                      style={{ background: 'var(--cs-inset)', borderColor: 'var(--cs-border)', color: 'var(--cs-text)' }}
+                    />
+                  </div>
                 </div>
+
+                {dbPrefs.quiet_start && dbPrefs.quiet_end && (
+                  <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-2.5 text-sm text-indigo-700 dark:text-indigo-400">
+                    Quiet from <strong>{dbPrefs.quiet_start}</strong> to <strong>{dbPrefs.quiet_end}</strong>
+                    {' '}— notifications will be silenced during this window.
+                  </div>
+                )}
+
+                {(dbPrefs.quiet_start || dbPrefs.quiet_end) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = { ...dbPrefs, quiet_start: null, quiet_end: null }
+                      setDbPrefs(next)
+                      savePrefs(next)
+                    }}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Clear quiet hours
+                  </button>
+                )}
               </div>
             </section>
 
@@ -735,34 +900,6 @@ export default function SettingsClient({
           </div>
         </Modal>
       )}
-    </div>
-  )
-}
-
-// ── NotifRow sub-component ────────────────────────────────────────────────────
-
-function NotifRow({
-  label, description,
-  pushEnabled, emailEnabled,
-  onTogglePush, onToggleEmail,
-}: {
-  label:         string
-  description:   string
-  pushEnabled:   boolean
-  emailEnabled:  boolean
-  onTogglePush:  () => void
-  onToggleEmail: () => void
-}) {
-  return (
-    <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--cs-inset)', border: '1px solid var(--cs-border)' }}>
-      <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--cs-text)' }}>{label}</p>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--cs-muted)' }}>{description}</p>
-      </div>
-      <div className="flex items-center gap-6">
-        <Toggle checked={pushEnabled} onChange={onTogglePush} label="Push" />
-        <Toggle checked={emailEnabled} onChange={onToggleEmail} label="Email" />
-      </div>
     </div>
   )
 }

@@ -524,6 +524,21 @@ export default function ChoresClient({
     </div>
   )
 
+  async function handleNudge(chore: ChoreWithAssignee): Promise<{ error?: string }> {
+    try {
+      const res = await fetch('/api/push/nudge', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ choreId: chore.id, householdId }),
+      })
+      const data = await res.json()
+      if (!res.ok) return { error: data.error ?? 'Nudge failed' }
+      return {}
+    } catch {
+      return { error: 'Network error' }
+    }
+  }
+
   function renderCard(c: ChoreWithAssignee) {
     return (
       <ChoreCard
@@ -541,6 +556,7 @@ export default function ChoresClient({
         onManualReassign={isAdmin ? setOverrideChore : undefined}
         onNotes={setNotesChore}
         onSubtasks={setSubtasksChore}
+        onNudge={handleNudge}
       />
     )
   }

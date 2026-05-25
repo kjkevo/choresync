@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ChoreCategory, ChoreFrequency, ChorePriority } from '@/lib/types/database'
 import { updateStreakAndCheckBadges } from '@/lib/badges'
+import { notifyAssigned } from '@/lib/push'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,18 @@ export async function createChore(formData: FormData) {
 
   if (dbErr) return { error: dbErr.message }
 
+  // Notify the assignee (fire-and-forget, no await needed to not block the action)
+  if (assigned_to && assigned_to !== user.id) {
+    const { data: creator } = await supabase.from('users').select('full_name').eq('id', user.id).maybeSingle()
+    const creatorName = (creator as { full_name: string | null } | null)?.full_name ?? 'Someone'
+    notifyAssigned({
+      assigneeId:   assigned_to,
+      householdId,
+      choreName:    rest.name,
+      assignerName: creatorName,
+    }).catch(() => {})
+  }
+
   revalidatePath('/chores')
   revalidatePath('/dashboard')
   return { success: true, chore }
@@ -191,6 +204,18 @@ export async function updateChore(choreId: string, formData: FormData) {
     .eq('id', choreId)
 
   if (dbErr) return { error: dbErr.message }
+
+  // Notify new assignee if assignment changed
+  if (assigned_to && assigned_to !== existing.assigned_to && assigned_to !== user.id) {
+    const { data: updater } = await supabase.from('users').select('full_name').eq('id', user.id).maybeSingle()
+    const updaterName = (updater as { full_name: string | null } | null)?.full_name ?? 'Someone'
+    notifyAssigned({
+      assigneeId:   assigned_to,
+      householdId:  existing.household_id,
+      choreName:    rest.name,
+      assignerName: updaterName,
+    }).catch(() => {})
+  }
 
   revalidatePath('/chores')
   revalidatePath('/dashboard')
