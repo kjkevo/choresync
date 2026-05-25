@@ -59,6 +59,11 @@ function formatDue(iso: string) {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+export interface HouseholdSummary {
+  id:   string
+  name: string
+}
+
 interface DashboardClientProps {
   currentUser:         UserRow
   myOverdueChores:     ChoreWithAssignee[]
@@ -69,6 +74,7 @@ interface DashboardClientProps {
   myStreak:            { current_streak: number; total_completions: number } | null
   pinnedAnnouncements: { id: string; content: string; author: UserRow | null }[]
   recentActivity:      ActivityEntry[]
+  allHouseholds?:      HouseholdSummary[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -82,6 +88,7 @@ export default function DashboardClient({
   myStreak,
   pinnedAnnouncements,
   recentActivity,
+  allHouseholds = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const [overdueChores,  setOverdueChores]  = useState(initialOverdue)
@@ -89,6 +96,7 @@ export default function DashboardClient({
   const [completeSheet,  setCompleteSheet]  = useState<ChoreWithAssignee | null>(null)
   const [quickPending,   setQuickPending]   = useState<Set<string>>(new Set())
   const [dismissedPins,  setDismissedPins]  = useState<Set<string>>(new Set())
+  const [switcherOpen,   setSwitcherOpen]   = useState(false)
   const [, startTransition]                 = useTransition()
 
   const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
@@ -135,10 +143,74 @@ export default function DashboardClient({
               ChoreSync
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', background: '#F3F4F6', borderRadius: 99, padding: '4px 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => allHouseholds.length > 1 && setSwitcherOpen(o => !o)}
+              style={{
+                fontSize: 12, fontWeight: 700, color: '#6B7280',
+                background: '#F3F4F6', borderRadius: 99, padding: '4px 10px',
+                border: 'none', cursor: allHouseholds.length > 1 ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
               {householdName}
-            </span>
+              {allHouseholds.length > 1 && (
+                <span style={{ fontSize: 10, color: '#9CA3AF' }}>▾</span>
+              )}
+            </button>
+
+            {/* Household switcher dropdown */}
+            {switcherOpen && allHouseholds.length > 1 && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  onClick={() => setSwitcherOpen(false)}
+                />
+                <div style={{
+                  position: 'absolute', top: 36, right: 0, zIndex: 50,
+                  background: '#fff', borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                  border: '1px solid #F0F0F0', minWidth: 200, overflow: 'hidden',
+                }}>
+                  <div style={{ padding: '10px 14px 6px', fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Switch Household
+                  </div>
+                  {allHouseholds.map(h => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      onClick={() => { setSwitcherOpen(false); router.push(`/dashboard?h=${h.id}`) }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '10px 14px', fontSize: 14, fontWeight: h.name === householdName ? 700 : 500,
+                        color: h.name === householdName ? '#FF6B2B' : '#374151',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        borderLeft: h.name === householdName ? '3px solid #FF6B2B' : '3px solid transparent',
+                      }}
+                    >
+                      {h.name}
+                    </button>
+                  ))}
+                  <div style={{ borderTop: '1px solid #F3F4F6', padding: '8px 10px', display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setSwitcherOpen(false); router.push('/onboarding?action=join') }}
+                      style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 700, color: '#6366F1', background: '#EEF2FF', border: 'none', borderRadius: 99, cursor: 'pointer' }}
+                    >
+                      + Join
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSwitcherOpen(false); router.push('/onboarding?action=create') }}
+                      style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 700, color: '#fff', background: '#FF6B2B', border: 'none', borderRadius: 99, cursor: 'pointer' }}
+                    >
+                      + Create
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
             <AvatarCircle user={currentUser} color={colorMap[currentUser.id]} size={32} />
           </div>
         </header>

@@ -63,7 +63,7 @@ export interface Database {
           id: string
           user_id: string
           household_id: string
-          role: 'admin' | 'member'
+          role: 'admin' | 'member' | 'kids'
           color_theme: string
           joined_at: string
         }
@@ -71,12 +71,12 @@ export interface Database {
           id?: string
           user_id: string
           household_id: string
-          role?: 'admin' | 'member'
+          role?: 'admin' | 'member' | 'kids'
           color_theme?: string
           joined_at?: string
         }
         Update: {
-          role?: 'admin' | 'member'
+          role?: 'admin' | 'member' | 'kids'
           color_theme?: string
         }
         Relationships: []

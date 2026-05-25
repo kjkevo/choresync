@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
-import type { ActivityEntry } from './DashboardClient'
+import type { ActivityEntry, HouseholdSummary } from './DashboardClient'
 import type {
   ChoreRow,
   ChoreWithAssignee,
@@ -24,8 +24,13 @@ const MOCK_USER: UserRow = {
   updated_at: new Date().toISOString(),
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ h?: string }>
+}) {
   const supabase = await createClient()
+  const params   = await searchParams
 
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -42,19 +47,22 @@ export default async function DashboardPage() {
         myStreak={null}
         pinnedAnnouncements={[]}
         recentActivity={[]}
+        allHouseholds={[]}
       />
     )
   }
 
-  // ── 1. Profile + membership ───────────────────────────────────────────────
-  const [{ data: profileRaw }, { data: membership }] = await Promise.all([
+  // ── 1. Profile + ALL memberships ─────────────────────────────────────────
+  const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),
-    supabase.from('household_members').select('household_id, role, color_theme').eq('user_id', user.id).maybeSingle(),
+    supabase.from('household_members')
+      .select('household_id, role, color_theme')
+      .eq('user_id', user.id),
   ])
   const profile = profileRaw as UserRow | null
 
   // No household yet — render empty dashboard rather than redirecting to onboarding
-  if (!membership) {
+  if (!allMemberships || allMemberships.length === 0) {
     return (
       <DashboardClient
         currentUser={profile as UserRow}
@@ -66,13 +74,32 @@ export default async function DashboardPage() {
         myStreak={null}
         pinnedAnnouncements={[]}
         recentActivity={[]}
+        allHouseholds={[]}
       />
     )
   }
 
-  const { household_id: householdId } = membership
+  // Pick active household: prefer ?h= param, else first membership
+  const allHouseholdIds = allMemberships.map(m => m.household_id)
+  const requestedId     = params.h && allHouseholdIds.includes(params.h) ? params.h : null
+  const activeMembership = requestedId
+    ? allMemberships.find(m => m.household_id === requestedId)!
+    : allMemberships[0]
 
-  // ── 2. All members (color map + profile lookup) ───────────────────────────
+  const { household_id: householdId } = activeMembership
+
+  // ── 2. Fetch household names for switcher ─────────────────────────────────
+  const { data: householdRowsRaw } = await supabase
+    .from('households')
+    .select('id, name')
+    .in('id', allHouseholdIds)
+
+  const allHouseholds: HouseholdSummary[] = (householdRowsRaw ?? []).map(h => ({
+    id:   h.id as string,
+    name: h.name as string,
+  }))
+
+  // ── 3. All members (color map + profile lookup) ───────────────────────────
   const { data: memberRowsRaw } = await supabase
     .from('household_members')
     .select('user_id, color_theme')
@@ -90,7 +117,7 @@ export default async function DashboardPage() {
   const memberProfiles = (memberProfilesRaw ?? []) as UserRow[]
   const profileMap: Record<string, UserRow> = Object.fromEntries(memberProfiles.map(p => [p.id, p]))
 
-  // ── 3. My chores: today + overdue ─────────────────────────────────────────
+  // ── 4. My chores: today + overdue ─────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0]
 
   const { data: myChoreRowsRaw } = await supabase
@@ -113,9 +140,10 @@ export default async function DashboardPage() {
   const myOverdue = myChores.filter(c => c.due_date! < today)
   const myToday   = myChores.filter(c => c.due_date === today)
 
-  // ── 4. Household name + my streak + pinned announcements ─────────────────
-  const [{ data: householdRaw }, { data: myStreak }, { data: pinnedRowsRaw }] = await Promise.all([
-    supabase.from('households').select('name').eq('id', householdId).maybeSingle(),
+  // ── 5. Household name + my streak + pinned announcements ─────────────────
+  const activeHousehold = allHouseholds.find(h => h.id === householdId)
+
+  const [{ data: myStreak }, { data: pinnedRowsRaw }] = await Promise.all([
     supabase.from('user_streaks')
       .select('current_streak, total_completions')
       .eq('user_id', user.id)
@@ -129,7 +157,6 @@ export default async function DashboardPage() {
       .limit(3),
   ])
 
-  const household  = householdRaw  as { name: string } | null
   const pinnedRows = (pinnedRowsRaw ?? []) as AnnouncementRow[]
 
   const pinnedAuthorIds = [...new Set(pinnedRows.map(a => a.created_by))]
@@ -145,7 +172,7 @@ export default async function DashboardPage() {
     author: pinnedAuthorMap[a.created_by] ?? null,
   }))
 
-  // ── 5. Recent activity feed ───────────────────────────────────────────────
+  // ── 6. Recent activity feed ───────────────────────────────────────────────
   const { data: completionsRaw } = await supabase
     .from('chore_completions')
     .select('*')
@@ -162,10 +189,10 @@ export default async function DashboardPage() {
     wasOnTime:   row.was_on_time,
     member: profileMap[row.completed_by]
       ? {
-          id:       row.completed_by,
-          name:     profileMap[row.completed_by].full_name,
-          avatarUrl:profileMap[row.completed_by].avatar_url,
-          color:    colorMap[row.completed_by] ?? '#6366f1',
+          id:        row.completed_by,
+          name:      profileMap[row.completed_by].full_name,
+          avatarUrl: profileMap[row.completed_by].avatar_url,
+          color:     colorMap[row.completed_by] ?? '#6366f1',
         }
       : null,
   }))
@@ -175,12 +202,13 @@ export default async function DashboardPage() {
       currentUser={profile as UserRow}
       myOverdueChores={myOverdue}
       myTodayChores={myToday}
-      householdName={household?.name ?? 'Your Household'}
+      householdName={activeHousehold?.name ?? 'Your Household'}
       householdId={householdId}
       colorMap={colorMap}
       myStreak={myStreak ?? null}
       pinnedAnnouncements={pinnedAnnouncements}
       recentActivity={recentActivity}
+      allHouseholds={allHouseholds}
     />
   )
 }

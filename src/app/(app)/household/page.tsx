@@ -16,7 +16,7 @@ export default async function HouseholdPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
+  if (!user) redirect('/dashboard')
 
   // ── 1. Caller's own membership ────────────────────────────────────────────
   const { data: myMembership } = await supabase
@@ -72,7 +72,7 @@ export default async function HouseholdPage() {
       household={household}
       members={members}
       currentUserId={user.id}
-      currentUserRole={myMembership.role as 'admin' | 'member'}
+      currentUserRole={myMembership.role as 'admin' | 'member' | 'kids'}
       currentUserMembershipId={myMembership.id}
     />
   )

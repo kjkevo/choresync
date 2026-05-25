@@ -16,6 +16,7 @@ import {
   updateMemberRole,
   updateMemberColor,
   leaveHousehold,
+  setMemberKidsMode,
 } from '@/lib/actions/household'
 import type { UserRow } from '@/lib/types/database'
 
@@ -24,7 +25,7 @@ import type { UserRow } from '@/lib/types/database'
 interface EnrichedMember {
   id:           string
   user_id:      string
-  role:         'admin' | 'member'
+  role:         'admin' | 'member' | 'kids'
   color_theme:  string
   joined_at:    string
   user:         UserRow
@@ -41,7 +42,7 @@ interface Props {
   household:               Household
   members:                 EnrichedMember[]
   currentUserId:           string
-  currentUserRole:         'admin' | 'member'
+  currentUserRole:         'admin' | 'member' | 'kids'
   currentUserMembershipId: string
 }
 
@@ -83,6 +84,7 @@ export default function HouseholdClient({
 
   // Invite code
   const [copied,        setCopied]        = useState(false)
+  const [copiedLink,    setCopiedLink]    = useState(false)
   const [regenPending,  setRegenPending]  = useState(false)
 
   // Open member action dropdowns — one open at a time
@@ -150,6 +152,13 @@ export default function HouseholdClient({
     setTimeout(() => setCopied(false), 2500)
   }
 
+  async function copyLink() {
+    const url = `${window.location.origin}/join/${household.invite_code}`
+    await navigator.clipboard.writeText(url)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2500)
+  }
+
   async function doRegenCode() {
     setRegenPending(true)
     const result = await regenerateInviteCode(household.id)
@@ -169,6 +178,20 @@ export default function HouseholdClient({
       danger:   false,
       onConfirm: doRegenCode,
     })
+  }
+
+  // ── Kids mode toggle ───────────────────────────────────────────────────────
+  async function toggleKidsMode(member: EnrichedMember, enable: boolean) {
+    setOpenMenu(null)
+    const result = await setMemberKidsMode(member.id, household.id, enable)
+    if (result?.error) {
+      showToast(result.error, 'err')
+    } else {
+      setMembers(ms =>
+        ms.map(m => (m.id === member.id ? { ...m, role: enable ? 'kids' : 'member' } : m))
+      )
+      showToast(enable ? `${memberDisplayName(member)} is now in Kids Mode.` : `${memberDisplayName(member)} is now a member.`)
+    }
   }
 
   // ── Role change ────────────────────────────────────────────────────────────
@@ -404,20 +427,37 @@ export default function HouseholdClient({
               onClick={copyCode}
               className={`btn-ghost flex-1 text-sm ${copied ? 'border-emerald-300 text-emerald-600' : ''}`}
             >
-              {copied ? <><CheckIcon /> Copied!</> : <><CopyIcon /> Copy</>}
+              {copied ? <><CheckIcon /> Copied!</> : <><CopyIcon /> Copy Code</>}
             </button>
+            <button
+              type="button"
+              onClick={copyLink}
+              className={`btn-ghost flex-1 text-sm ${copiedLink ? 'border-emerald-300 text-emerald-600' : ''}`}
+            >
+              {copiedLink ? <><CheckIcon /> Link Copied!</> : <><ShareIcon /> Copy Link</>}
+            </button>
+          </div>
+
+          {/* Shareable URL */}
+          <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 flex items-center gap-2">
+            <span className="text-xs text-slate-400 flex-1 truncate font-mono">
+              {typeof window !== 'undefined'
+                ? `${window.location.origin}/join/${household.invite_code}`
+                : `/join/${household.invite_code}`}
+            </span>
             {typeof navigator !== 'undefined' && 'share' in navigator && (
               <button
                 type="button"
                 onClick={() =>
                   navigator.share({
                     title: `Join ${household.name} on ChoreSync`,
-                    text:  `Use code ${household.invite_code} to join our household!`,
+                    url:   `${window.location.origin}/join/${household.invite_code}`,
                   })
                 }
-                className="btn-ghost flex-1 text-sm"
+                className="flex-shrink-0 text-indigo-500 hover:text-indigo-700 transition-colors"
+                title="Share link"
               >
-                <ShareIcon /> Share
+                <ShareIcon />
               </button>
             )}
           </div>
@@ -468,7 +508,7 @@ export default function HouseholdClient({
                       )}
                     </button>
 
-                    {/* Admin crown badge */}
+                    {/* Role badge */}
                     {member.role === 'admin' && (
                       <span
                         className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[9px] shadow-sm"
@@ -476,6 +516,15 @@ export default function HouseholdClient({
                         aria-label="Admin"
                       >
                         👑
+                      </span>
+                    )}
+                    {member.role === 'kids' && (
+                      <span
+                        className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-sky-300 text-[9px] shadow-sm"
+                        title="Kids Mode"
+                        aria-label="Kids Mode"
+                      >
+                        🧒
                       </span>
                     )}
                   </div>
@@ -521,8 +570,12 @@ export default function HouseholdClient({
                       )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className={`text-xs font-medium ${member.role === 'admin' ? 'text-amber-600' : 'text-slate-400'}`}>
-                        {member.role === 'admin' ? 'Admin' : 'Member'}
+                      <span className={`text-xs font-medium ${
+                        member.role === 'admin' ? 'text-amber-600' :
+                        member.role === 'kids'  ? 'text-sky-500' :
+                        'text-slate-400'
+                      }`}>
+                        {member.role === 'admin' ? 'Admin' : member.role === 'kids' ? 'Kids Mode' : 'Member'}
                       </span>
                       <span className="text-slate-200">·</span>
                       <span className="text-xs text-slate-400">
@@ -556,18 +609,30 @@ export default function HouseholdClient({
                           {/* Admin actions on other members */}
                           {isAdmin && !isMe && (
                             <>
-                              <MenuButton
-                                onClick={() =>
-                                  changeRole(
-                                    member,
-                                    member.role === 'admin' ? 'member' : 'admin'
-                                  )
-                                }
-                              >
-                                {member.role === 'admin'
-                                  ? '⬇️  Demote to Member'
-                                  : '⬆️  Make Admin'}
-                              </MenuButton>
+                              {member.role !== 'kids' && (
+                                <MenuButton
+                                  onClick={() =>
+                                    changeRole(
+                                      member,
+                                      member.role === 'admin' ? 'member' : 'admin'
+                                    )
+                                  }
+                                >
+                                  {member.role === 'admin'
+                                    ? '⬇️  Demote to Member'
+                                    : '⬆️  Make Admin'}
+                                </MenuButton>
+                              )}
+                              {member.role === 'member' && (
+                                <MenuButton onClick={() => toggleKidsMode(member, true)}>
+                                  🧒  Enable Kids Mode
+                                </MenuButton>
+                              )}
+                              {member.role === 'kids' && (
+                                <MenuButton onClick={() => toggleKidsMode(member, false)}>
+                                  👤  Remove Kids Mode
+                                </MenuButton>
+                              )}
                               <div className="my-1 h-px bg-slate-100" />
                               <MenuButton danger onClick={() => confirmRemove(member)}>
                                 🚫  Remove from Household

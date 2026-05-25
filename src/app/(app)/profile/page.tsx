@@ -30,7 +30,7 @@ export default async function ProfilePage() {
     .eq('user_id', user.id)
     .maybeSingle()
 
-  let membership: { role: 'admin' | 'member'; color_theme: string; household: { id: string; name: string } | null } | null = null
+  let membership: { role: 'admin' | 'member' | 'kids'; color_theme: string; household: { id: string; name: string } | null } | null = null
 
   if (membershipRow) {
     const { data: household } = await supabase

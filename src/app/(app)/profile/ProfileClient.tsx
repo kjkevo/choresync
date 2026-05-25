@@ -8,7 +8,7 @@ import type { UserRow } from '@/lib/types/database'
 import type { User } from '@supabase/supabase-js'
 
 interface Membership {
-  role: 'admin' | 'member'
+  role: 'admin' | 'member' | 'kids'
   color_theme: string
   household: { id: string; name: string } | null
 }
