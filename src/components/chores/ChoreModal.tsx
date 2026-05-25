@@ -24,7 +24,7 @@ export const CATEGORY_META: Record<ChoreCategory, { label: string; emoji: string
 export const PRIORITY_META: Record<ChorePriority, { label: string; color: string; ring: string }> = {
   low:    { label: 'Low',    color: 'bg-emerald-500', ring: 'ring-emerald-500' },
   medium: { label: 'Medium', color: 'bg-amber-400',   ring: 'ring-amber-400'   },
-  high:   { label: 'High',   color: 'bg-red-500',     ring: 'ring-red-500'     },
+  high:   { label: 'Urgent', color: 'bg-red-500',     ring: 'ring-red-500'     },
 }
 
 export const FREQUENCY_OPTIONS: { value: ChoreFrequency; label: string }[] = [
@@ -85,6 +85,15 @@ export default function ChoreModal({
   const [rotationEnabled, setRotationEnabled] = useState(chore?.rotation_enabled ?? false)
   const [rotationMembers, setRotationMembers] = useState<string[]>(existingMembers)
 
+  // Subtasks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingSubtasks = Array.isArray((chore as any)?.subtasks)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? (chore as any).subtasks as { id: string; title: string; completed: boolean }[]
+    : []
+  const [subtasks,      setSubtasks]      = useState(existingSubtasks)
+  const [newSubtaskText, setNewSubtaskText] = useState('')
+
   // Form state
   const [isPending, startTransition] = useTransition()
   const [error, setError]            = useState<string | null>(null)
@@ -119,6 +128,16 @@ export default function ChoreModal({
     })
   }
 
+  function addSubtask() {
+    const title = newSubtaskText.trim()
+    if (!title) return
+    setSubtasks(prev => [...prev, { id: crypto.randomUUID(), title, completed: false }])
+    setNewSubtaskText('')
+  }
+  function removeSubtask(id: string) {
+    setSubtasks(prev => prev.filter(s => s.id !== id))
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
@@ -140,6 +159,7 @@ export default function ChoreModal({
     fd.set('points',           String(points))
     fd.set('rotation_enabled', String(rotationEnabled))
     fd.set('rotation_members', JSON.stringify(rotationMembers))
+    fd.set('subtasks', JSON.stringify(subtasks))
 
     startTransition(async () => {
       const result = isEdit
@@ -492,6 +512,52 @@ export default function ChoreModal({
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* ── Checklist / Subtasks ──────────────────────────────────────────── */}
+              <div>
+                <p className="label">Checklist <span className="text-slate-300 normal-case font-normal">(optional)</span></p>
+
+                {subtasks.length > 0 && (
+                  <ul className="mb-3 space-y-1.5">
+                    {subtasks.map((s, i) => (
+                      <li key={s.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                        <span className="text-xs font-bold text-slate-300 w-4 text-center">{i + 1}</span>
+                        <span className="flex-1 text-sm text-slate-800">{s.title}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeSubtask(s.id)}
+                          className="rounded p-0.5 text-slate-300 hover:text-red-500 transition-colors"
+                          aria-label="Remove step"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSubtaskText}
+                    onChange={e => setNewSubtaskText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubtask() } }}
+                    placeholder='e.g. "Scrub the toilet"'
+                    maxLength={120}
+                    className="input flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={addSubtask}
+                    disabled={!newSubtaskText.trim()}
+                    className="flex items-center gap-1.5 rounded-xl border-2 border-indigo-400 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    + Add
+                  </button>
+                </div>
               </div>
             </div>
           </form>

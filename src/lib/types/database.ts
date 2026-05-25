@@ -106,6 +106,7 @@ export interface Database {
           rotation_members: string[]       // ordered user_id array
           rotation_index: number
           points: number                   // 0–100
+          subtasks: Json
         }
         Insert: {
           id?: string
@@ -130,6 +131,7 @@ export interface Database {
           rotation_members?: string[]
           rotation_index?: number
           points?: number
+          subtasks?: Json
         }
         Update: {
           name?: string
@@ -150,6 +152,7 @@ export interface Database {
           rotation_members?: string[]
           rotation_index?: number
           points?: number
+          subtasks?: Json
         }
         Relationships: []
       }
@@ -563,6 +566,12 @@ export interface MessageWithMeta extends MessageRow {
 
 export interface ChoreCommentWithAuthor extends ChoreCommentRow {
   author: UserRow | null
+}
+
+export interface SubtaskItem {
+  id:        string
+  title:     string
+  completed: boolean
 }
 
 export interface AnnouncementWithAuthor extends AnnouncementRow {

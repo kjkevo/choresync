@@ -7,6 +7,8 @@ import ChoreModal, { CATEGORY_META } from '@/components/chores/ChoreModal'
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
 import ChoreCommentsSheet from '@/components/chores/ChoreCommentsSheet'
 import SwapRequestModal, { ManualOverrideModal } from '@/components/chores/SwapRequestModal'
+import SubtasksSheet from '@/components/chores/SubtasksSheet'
+import TemplatesSheet from '@/components/chores/TemplatesSheet'
 import { deleteChore, reopenChore } from '@/lib/actions/chores'
 import { respondToSwap, manualOverride } from '@/lib/actions/rotation'
 import type {
@@ -14,6 +16,7 @@ import type {
   ChoreCategory,
   UserRow,
   SwapRequestWithDetails,
+  SubtaskItem,
 } from '@/lib/types/database'
 import type { NextUpPerson } from '@/components/chores/ChoreCard'
 
@@ -78,6 +81,8 @@ export default function ChoresClient({
   const [toast,         setToast]         = useState<string | null>(null)
   const [swapPending,   setSwapPending]   = useState<Set<string>>(new Set())
   const [isDeleting,    startDeleteTx]    = useTransition()
+  const [subtasksChore,  setSubtasksChore]  = useState<ChoreWithAssignee | null>(null)
+  const [showTemplates,  setShowTemplates]   = useState(false)
 
   const modalOpen = modalChore !== null && (modalChore as unknown) !== 'null'
 
@@ -345,6 +350,28 @@ export default function ChoresClient({
         />
       )}
 
+      {subtasksChore && (
+        <SubtasksSheet
+          chore={subtasksChore}
+          onClose={() => setSubtasksChore(null)}
+          onUpdated={(choreId, newSubtasks) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setChores(prev => prev.map(c => c.id === choreId ? { ...c, subtasks: newSubtasks as any } : c))
+          }}
+        />
+      )}
+
+      {showTemplates && (
+        <TemplatesSheet
+          householdId={householdId}
+          onClose={() => setShowTemplates(false)}
+          onImported={count => {
+            showToast(`✅ ${count} chores added from template!`)
+            router.refresh()
+          }}
+        />
+      )}
+
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 pb-20 pt-10 text-white">
         <div className="mx-auto max-w-2xl">
@@ -357,13 +384,22 @@ export default function ChoresClient({
               </p>
             </div>
             {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setModalChore('new')}
-                className="flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
-              >
-                <PlusIcon className="h-4 w-4" /> New Chore
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-white/25"
+                >
+                  📦 Templates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalChore('new')}
+                  className="flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
+                >
+                  <PlusIcon className="h-4 w-4" /> New Chore
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -502,6 +538,7 @@ export default function ChoresClient({
         onSwapRequest={!isAdmin ? setSwapChore : undefined}
         onManualReassign={isAdmin ? setOverrideChore : undefined}
         onNotes={setNotesChore}
+        onSubtasks={setSubtasksChore}
       />
     )
   }

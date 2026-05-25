@@ -83,6 +83,7 @@ interface ChoreCardProps {
   onSwapRequest?:    (chore: ChoreWithAssignee) => void    // non-admin: request swap
   onManualReassign?: (chore: ChoreWithAssignee) => void   // admin: override assignee
   onNotes?:          (chore: ChoreWithAssignee) => void   // open comments sheet
+  onSubtasks?:       (chore: ChoreWithAssignee) => void
 }
 
 export default function ChoreCard({
@@ -99,6 +100,7 @@ export default function ChoreCard({
   onSwapRequest,
   onManualReassign,
   onNotes,
+  onSubtasks,
 }: ChoreCardProps) {
   const overdue   = isOverdue(chore.due_date, chore.status)
   const dueToday  = isDueToday(chore.due_date)
@@ -215,6 +217,24 @@ export default function ChoreCard({
               ⏱ {timeLabel}
             </span>
           )}
+
+          {/* Subtask progress */}
+          {(() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const subs = Array.isArray((chore as any).subtasks) ? (chore as any).subtasks as { id: string; completed: boolean }[] : []
+            if (subs.length === 0) return null
+            const doneCount = subs.filter(s => s.completed).length
+            return (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onSubtasks?.(chore) }}
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold transition
+                  ${doneCount === subs.length ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}
+              >
+                ☑️ {doneCount}/{subs.length}
+              </button>
+            )
+          })()}
 
           {/* Photo proof */}
           {chore.photo_proof_url && (

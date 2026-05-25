@@ -47,6 +47,18 @@ function parseChoreForm(formData: FormData, allowedCustomCategories: string[] = 
     rotation_members = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
   } catch { rotation_members = [] }
 
+  // Subtasks
+  let subtasks: { id: string; title: string; completed: boolean }[] = []
+  try {
+    const rawSubs = formData.get('subtasks') as string | null
+    const parsedSubs = rawSubs ? JSON.parse(rawSubs) : []
+    subtasks = Array.isArray(parsedSubs)
+      ? parsedSubs.filter((x: unknown): x is { id: string; title: string; completed: boolean } =>
+          typeof x === 'object' && x !== null && typeof (x as Record<string, unknown>).title === 'string'
+        )
+      : []
+  } catch { subtasks = [] }
+
   if (!name || name.length < 1)   return { error: 'Chore name is required.' }
   if (name.length > 120)          return { error: 'Name must be 120 characters or fewer.' }
   if (!VALID_FREQUENCIES.includes(frequency)) return { error: 'Invalid frequency.' }
@@ -67,7 +79,7 @@ function parseChoreForm(formData: FormData, allowedCustomCategories: string[] = 
   return {
     data: {
       name, description, assigned_to, due_date, frequency, priority, category,
-      estimated_mins, points, rotation_enabled, rotation_members,
+      estimated_mins, points, rotation_enabled, rotation_members, subtasks,
     },
   }
 }
@@ -102,7 +114,7 @@ export async function createChore(formData: FormData) {
   const parsed = parseChoreForm(formData, customCats)
   if ('error' in parsed) return parsed
 
-  const { rotation_enabled, rotation_members, ...rest } = parsed.data
+  const { rotation_enabled, rotation_members, subtasks, ...rest } = parsed.data
 
   // For rotation chores, pin assigned_to to the first member in the rotation
   const assigned_to = rotation_enabled ? rotation_members[0] : rest.assigned_to
@@ -117,6 +129,7 @@ export async function createChore(formData: FormData) {
       rotation_enabled,
       rotation_members,
       rotation_index:   0,
+      subtasks,
     })
     .select()
     .single()
@@ -152,7 +165,7 @@ export async function updateChore(choreId: string, formData: FormData) {
   const parsed = parseChoreForm(formData, customCats)
   if ('error' in parsed) return parsed
 
-  const { rotation_enabled, rotation_members, ...rest } = parsed.data
+  const { rotation_enabled, rotation_members, subtasks, ...rest } = parsed.data
 
   let rotation_index = 0
   let assigned_to = rest.assigned_to
@@ -173,6 +186,7 @@ export async function updateChore(choreId: string, formData: FormData) {
       rotation_enabled,
       rotation_members: rotation_enabled ? rotation_members : [],
       rotation_index,
+      subtasks,
     })
     .eq('id', choreId)
 
@@ -384,4 +398,42 @@ export async function uploadChorePhoto(choreId: string, formData: FormData) {
 
   revalidatePath('/chores')
   return { success: true, photoUrl: publicUrl }
+}
+
+// ── Toggle subtask ────────────────────────────────────────────────────────────
+
+export async function toggleSubtask(choreId: string, subtaskId: string, completed: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated.' }
+
+  const { data: chore } = await supabase
+    .from('chores')
+    .select('household_id, subtasks')
+    .eq('id', choreId)
+    .maybeSingle()
+
+  if (!chore) return { error: 'Chore not found.' }
+
+  const { data: membership } = await supabase
+    .from('household_members')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('household_id', chore.household_id)
+    .maybeSingle()
+
+  if (!membership) return { error: 'Not a member of this household.' }
+
+  const current = (Array.isArray(chore.subtasks) ? chore.subtasks : []) as { id: string; title: string; completed: boolean }[]
+  const updated = current.map(s => s.id === subtaskId ? { ...s, completed } : s)
+
+  const { error: dbErr } = await supabase
+    .from('chores')
+    .update({ subtasks: updated })
+    .eq('id', choreId)
+
+  if (dbErr) return { error: dbErr.message }
+  revalidatePath('/chores')
+  revalidatePath('/dashboard')
+  return { success: true }
 }
