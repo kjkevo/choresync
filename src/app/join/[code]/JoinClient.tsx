@@ -11,20 +11,26 @@ interface Props {
 }
 
 export default function JoinClient({ code, householdName, memberCount }: Props) {
-  const [name,      setName]      = useState('')
-  const [focused,   setFocused]   = useState(false)
-  const [error,     setError]     = useState<string | null>(null)
-  const [joined,    setJoined]    = useState<string | null>(null) // household name after joining
-  const [isPending, startTransition] = useTransition()
+  const [name,       setName]       = useState('')
+  const [focused,    setFocused]    = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [needsLogin, setNeedsLogin] = useState(false)
+  const [joined,     setJoined]     = useState<string | null>(null) // household name after joining
+  const [isPending,  startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('Please enter your display name.'); return }
     setError(null)
+    setNeedsLogin(false)
     startTransition(async () => {
       const result = await joinViaLink(code, name.trim())
       if (result?.error) {
-        setError(result.error)
+        if (result.error.toLowerCase().includes('sign in')) {
+          setNeedsLogin(true)
+        } else {
+          setError(result.error)
+        }
       } else {
         setJoined(householdName ?? 'your household')
       }
@@ -109,6 +115,41 @@ export default function JoinClient({ code, householdName, memberCount }: Props) 
 
           {/* Divider */}
           <div style={{ height: 1, background: '#F3F4F6', margin: '0 0 24px' }} />
+
+          {/* Needs login prompt */}
+          {needsLogin && (
+            <div style={{
+              background: '#EFF6FF', border: '1px solid #BFDBFE',
+              borderRadius: 10, padding: '12px 14px', marginBottom: 16,
+              fontFamily: '"Nunito", sans-serif',
+            }}>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#1E40AF', fontWeight: 700 }}>
+                You need to be signed in to join.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Link
+                  href={`/login?redirect=/join/${code}`}
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '8px 0',
+                    background: '#FF6B2B', color: '#fff', borderRadius: 99,
+                    fontWeight: 700, fontSize: 13, textDecoration: 'none',
+                  }}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href={`/signup?redirect=/join/${code}`}
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '8px 0',
+                    background: '#F3F4F6', color: '#374151', borderRadius: 99,
+                    fontWeight: 700, fontSize: 13, textDecoration: 'none',
+                  }}
+                >
+                  Create Account
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* Error */}
           {error && (

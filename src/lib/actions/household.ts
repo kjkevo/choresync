@@ -385,7 +385,11 @@ export async function joinViaLink(code: string, displayName: string) {
   if (alreadyIn) return { error: 'You are already a member of this household.' }
 
   if (displayName.trim()) {
-    await supabase.from('users').update({ full_name: displayName.trim() }).eq('id', user.id)
+    const { error: nameErr } = await supabase
+      .from('users')
+      .update({ full_name: displayName.trim() })
+      .eq('id', user.id)
+    if (nameErr) return { error: 'Could not save your display name. Please try again.' }
   }
 
   const { error: joinErr } = await supabase
