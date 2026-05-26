@@ -100,6 +100,20 @@ function buildTrend(rows: CompletionRaw[], weeksBack = 8): WeeklyTrend[] {
   return trend
 }
 
+// Compute a simple { total, onTime, late } snapshot for a period slice
+function periodSnapshot(rows: CompletionRaw[], from: Date, to: Date): { total: number; onTime: number; late: number } {
+  const slice = rows.filter(r => {
+    const d = new Date(r.completed_at)
+    return d >= from && d < to
+  })
+  let onTime = 0, late = 0
+  for (const r of slice) {
+    if (r.was_on_time === true)  onTime++
+    if (r.was_on_time === false) late++
+  }
+  return { total: slice.length, onTime, late }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function HistoryPage() {
@@ -136,17 +150,43 @@ export default async function HistoryPage() {
     color:     colorMap[uid] ?? '#6366f1',
   }))
 
-  // ── 3. Last 90 days of completions ────────────────────────────────────────
-  const since90 = new Date()
-  since90.setDate(since90.getDate() - 90)
+  // ── 3. Last 180 days of completions (extended for prev-month comparison) ──
+  const since180 = new Date()
+  since180.setDate(since180.getDate() - 180)
 
-  const { data: raw } = await supabase
-    .from('chore_completions')
-    .select('*')
-    .eq('household_id', householdId)
-    .gte('completed_at', since90.toISOString())
-    .order('completed_at', { ascending: false })
-    .limit(500)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const in7Days = new Date(today)
+  in7Days.setDate(today.getDate() + 7)
+  const todayStr   = today.toISOString().split('T')[0]
+  const in7DaysStr = in7Days.toISOString().split('T')[0]
+
+  // Run completions + upcoming chores + household name in parallel
+  const [
+    { data: raw },
+    { data: upcomingRaw },
+    { data: household },
+  ] = await Promise.all([
+    supabase
+      .from('chore_completions')
+      .select('*')
+      .eq('household_id', householdId)
+      .gte('completed_at', since180.toISOString())
+      .order('completed_at', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('chores')
+      .select('id, name, category, due_date, assigned_to, priority, points')
+      .eq('household_id', householdId)
+      .eq('status', 'incomplete')
+      .not('due_date', 'is', null)
+      .gte('due_date', todayStr)
+      .lte('due_date', in7DaysStr)
+      .order('due_date', { ascending: true })
+      .limit(20),
+    supabase
+      .from('households').select('name').eq('id', householdId).maybeSingle(),
+  ])
 
   const completions = (raw ?? []) as ChoreCompletionRow[]
 
@@ -160,13 +200,40 @@ export default async function HistoryPage() {
   const weekSummary  = aggregate(completions, startOfWeek(),  members)
   const monthSummary = aggregate(completions, startOfMonth(), members)
 
-  // Attach weekly trend (uses all 90 days for context)
+  // Attach weekly trend (uses all 180 days for context)
   weekSummary.weeklyTrend  = buildTrend(completions, 8)
   monthSummary.weeklyTrend = buildTrend(completions, 8)
 
-  // ── 5. Household name ─────────────────────────────────────────────────────
-  const { data: household } = await supabase
-    .from('households').select('name').eq('id', householdId).maybeSingle()
+  // ── 5. Previous-period snapshots ──────────────────────────────────────────
+  const thisWeekStart  = startOfWeek()
+  const prevWeekStart  = new Date(thisWeekStart)
+  prevWeekStart.setDate(thisWeekStart.getDate() - 7)
+
+  const thisMonthStart = startOfMonth()
+  const prevMonthStart = new Date(thisMonthStart.getFullYear(), thisMonthStart.getMonth() - 1, 1)
+
+  const prevWeekSnap  = periodSnapshot(completions, prevWeekStart, thisWeekStart)
+  const prevMonthSnap = periodSnapshot(completions, prevMonthStart, thisMonthStart)
+
+  // ── 6. Enrich upcoming chores ─────────────────────────────────────────────
+  type UpcomingRaw = { id: string; name: string; category: string; due_date: string | null; assigned_to: string | null; priority: string; points: number }
+  const upcomingChores = (upcomingRaw ?? []).map((c: UpcomingRaw) => {
+    const profile = c.assigned_to ? profileMap[c.assigned_to] : null
+    const color   = c.assigned_to ? (colorMap[c.assigned_to] ?? '#6366f1') : '#94a3b8'
+    return {
+      id:            c.id,
+      name:          c.name,
+      category:      c.category,
+      dueDate:       c.due_date ?? '',
+      assigneeName:  profile?.full_name ?? null,
+      assigneeColor: color,
+      priority:      c.priority ?? 'medium',
+      points:        c.points ?? 0,
+    }
+  })
+
+  // suppress unused warning — profile is used via household_id path
+  void profile
 
   return (
     <HistoryClient
@@ -177,6 +244,9 @@ export default async function HistoryPage() {
       logEntries={logEntries}
       weekSummary={weekSummary}
       monthSummary={monthSummary}
+      prevWeekSnap={prevWeekSnap}
+      prevMonthSnap={prevMonthSnap}
+      upcomingChores={upcomingChores}
     />
   )
 }

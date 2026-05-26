@@ -51,10 +51,27 @@ function pct(n: number, total: number) {
   return total === 0 ? 0 : Math.round((n / total) * 100)
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// ── Prop types ────────────────────────────────────────────────────────────────
 
 interface Member {
   id: string; name: string | null; avatarUrl: string | null; color: string
+}
+
+interface PeriodSnapshot {
+  total: number
+  onTime: number
+  late: number
+}
+
+interface UpcomingChore {
+  id: string
+  name: string
+  category: string
+  dueDate: string
+  assigneeName: string | null
+  assigneeColor: string
+  priority: string
+  points: number
 }
 
 interface HistoryClientProps {
@@ -65,6 +82,9 @@ interface HistoryClientProps {
   logEntries:     ChoreCompletionWithMember[]
   weekSummary:    AnalyticsSummary
   monthSummary:   AnalyticsSummary
+  prevWeekSnap:   PeriodSnapshot
+  prevMonthSnap:  PeriodSnapshot
+  upcomingChores: UpcomingChore[]
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -77,8 +97,18 @@ export default function HistoryClient({
   logEntries,
   weekSummary,
   monthSummary,
+  prevWeekSnap,
+  prevMonthSnap,
+  upcomingChores,
 }: HistoryClientProps) {
-  const [tab, setTab] = useState<'log' | 'analytics' | 'export'>('log')
+  const [tab, setTab] = useState<'log' | 'analytics' | 'digest' | 'export'>('log')
+
+  const tabConfig = [
+    { id: 'log'       as const, label: '📋 History Log' },
+    { id: 'analytics' as const, label: '📊 Analytics'   },
+    { id: 'digest'    as const, label: '📬 Digest'       },
+    { id: 'export'    as const, label: '📥 Export'       },
+  ]
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--cs-bg)' }}>
@@ -95,13 +125,13 @@ export default function HistoryClient({
           </nav>
         </div>
         {/* Tab strip */}
-        <div className="mx-auto flex max-w-3xl" style={{ borderTop: '1px solid var(--cs-border)' }}>
-          {(['log', 'analytics', 'export'] as const).map(t => (
-            <button key={t} type="button" onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 text-xs font-semibold transition border-b-2
-                ${tab === t ? 'border-indigo-600 text-indigo-700' : 'border-transparent hover:text-slate-700 dark:hover:text-slate-300'}`}
-              style={tab !== t ? { color: 'var(--cs-muted)' } : {}}>
-              {t === 'log' ? '📋 History Log' : t === 'analytics' ? '📊 Analytics' : '📥 Export'}
+        <div className="mx-auto flex max-w-3xl overflow-x-auto" style={{ borderTop: '1px solid var(--cs-border)' }}>
+          {tabConfig.map(({ id, label }) => (
+            <button key={id} type="button" onClick={() => setTab(id)}
+              className={`flex-shrink-0 flex-1 py-2.5 text-xs font-semibold transition border-b-2
+                ${tab === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent hover:text-slate-700 dark:hover:text-slate-300'}`}
+              style={tab !== id ? { color: 'var(--cs-muted)' } : {}}>
+              {label}
             </button>
           ))}
         </div>
@@ -112,7 +142,19 @@ export default function HistoryClient({
           <LogTab entries={logEntries} members={members} currentUserId={currentUserId} />
         )}
         {tab === 'analytics' && (
-          <AnalyticsTab weekSummary={weekSummary} monthSummary={monthSummary} />
+          <AnalyticsTab weekSummary={weekSummary} monthSummary={monthSummary} members={members} />
+        )}
+        {tab === 'digest' && (
+          <DigestTab
+            weekSummary={weekSummary}
+            monthSummary={monthSummary}
+            prevWeekSnap={prevWeekSnap}
+            prevMonthSnap={prevMonthSnap}
+            upcomingChores={upcomingChores}
+            members={members}
+            householdName={householdName}
+            currentUserId={currentUserId}
+          />
         )}
         {tab === 'export' && (
           <ExportTab
@@ -357,10 +399,11 @@ function LogRow({ entry, currentUserId }: { entry: ChoreCompletionWithMember; cu
 // ══════════════════════════════════════════════════════════════════════════════
 
 function AnalyticsTab({
-  weekSummary, monthSummary,
+  weekSummary, monthSummary, members,
 }: {
   weekSummary:  AnalyticsSummary
   monthSummary: AnalyticsSummary
+  members:      Member[]
 }) {
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   const s = period === 'week' ? weekSummary : monthSummary
@@ -469,6 +512,9 @@ function AnalyticsTab({
         </div>
       )}
 
+      {/* Fairness section */}
+      <FairnessSection summary={s} members={members} period={period} />
+
       {s.total === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
           <p className="text-3xl">📊</p>
@@ -476,6 +522,116 @@ function AnalyticsTab({
           <p className="mt-1 text-sm text-slate-400">Complete some chores to see analytics here.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── FairnessSection ───────────────────────────────────────────────────────────
+
+function FairnessSection({
+  summary, members, period,
+}: {
+  summary: AnalyticsSummary
+  members: Member[]
+  period: 'week' | 'month'
+}) {
+  const activeMembers = summary.byMember.filter(m => m.completions > 0)
+  if (activeMembers.length < 2) return null
+
+  const total = summary.total
+  const idealShare = 100 / activeMembers.length
+
+  // Merge member color from members prop (byMember only has what's in AnalyticsSummary)
+  const memberColorMap = Object.fromEntries(members.map(m => [m.id, m.color]))
+
+  const rows = activeMembers.map(m => {
+    const theirShare   = pct(m.completions, total)
+    const ratio        = theirShare / idealShare
+    const color        = memberColorMap[m.userId] ?? m.color
+    const label =
+      ratio > 1.25 ? { text: 'Carrying more weight', icon: '💪', tint: '#dcfce7', textColor: '#166534' }
+      : ratio < 0.75 ? { text: 'Below fair share', icon: '⚠️', tint: '#fef9c3', textColor: '#713f12' }
+      : { text: 'Fair share', icon: null, tint: 'transparent', textColor: '#64748b' }
+    return { m, theirShare, ratio, color, label }
+  })
+
+  const mostOverloaded = rows.find(r => r.ratio > 1.5)
+  const leastActive    = rows.find(r => r.ratio < 0.5)
+  const balanced       = rows.every(r => r.ratio >= 0.75 && r.ratio <= 1.25)
+
+  const periodLabel = period === 'week' ? 'week' : 'month'
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800">⚖️ Chore Fairness</h3>
+      <p className="mt-0.5 mb-4 text-xs text-slate-400">How evenly is the work distributed this {periodLabel}?</p>
+
+      <div className="space-y-4">
+        {rows.map(({ m, theirShare, ratio, color, label }) => (
+          <div key={m.userId}>
+            <div className="mb-1.5 flex items-center gap-2">
+              {/* Avatar */}
+              <div
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white"
+                style={{ background: color }}
+              >
+                {m.avatarUrl ? (
+                  <Image src={m.avatarUrl} alt={m.name ?? ''} width={28} height={28} className="h-full w-full object-cover" unoptimized />
+                ) : (
+                  initials(m.name)
+                )}
+              </div>
+              <span className="text-xs font-semibold text-slate-700 flex-1">{m.name ?? 'Unknown'}</span>
+              {/* Label badge */}
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{ background: label.tint, color: label.textColor }}
+              >
+                {label.icon ? `${label.icon} ` : ''}{label.text}
+              </span>
+            </div>
+
+            {/* Bar */}
+            <div className="relative h-3 overflow-visible rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${theirShare}%`, background: color, opacity: 0.85 }}
+              />
+              {/* Ideal tick */}
+              <div
+                className="absolute top-0 h-full w-0.5 bg-slate-400 rounded-full"
+                style={{ left: `${Math.min(idealShare, 100)}%` }}
+                title={`Ideal: ${Math.round(idealShare)}%`}
+              />
+            </div>
+
+            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+              <span>{theirShare}% of chores</span>
+              <span>Ideal: {Math.round(idealShare)}%  ·  {ratio.toFixed(1)}× fair share</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom callout */}
+      <div className="mt-4 rounded-xl px-4 py-3 text-xs" style={{ background: 'var(--cs-inset, #f8fafc)' }}>
+        {balanced ? (
+          <p className="font-semibold text-emerald-700">✅ Great balance — everyone&apos;s pulling their weight!</p>
+        ) : (
+          <div className="space-y-1">
+            {mostOverloaded && (
+              <p className="text-slate-700">
+                <span className="font-semibold">Most overloaded:</span> {mostOverloaded.m.name ?? 'Unknown'} (doing {mostOverloaded.ratio.toFixed(1)}× their fair share)
+              </p>
+            )}
+            {leastActive && (
+              <p className="text-slate-700">
+                <span className="font-semibold">Least active:</span> {leastActive.m.name ?? 'Unknown'} ({leastActive.theirShare}% vs {Math.round(idealShare)}% ideal)
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -626,6 +782,268 @@ function TrendChart({ trend, max }: { trend: AnalyticsSummary['weeklyTrend']; ma
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// DIGEST TAB
+// ══════════════════════════════════════════════════════════════════════════════
+
+function DigestTab({
+  weekSummary,
+  monthSummary,
+  prevWeekSnap,
+  prevMonthSnap,
+  upcomingChores,
+  members,
+  householdName,
+  currentUserId,
+}: {
+  weekSummary:    AnalyticsSummary
+  monthSummary:   AnalyticsSummary
+  prevWeekSnap:   PeriodSnapshot
+  prevMonthSnap:  PeriodSnapshot
+  upcomingChores: UpcomingChore[]
+  members:        Member[]
+  householdName:  string
+  currentUserId:  string
+}) {
+  const [period, setPeriod] = useState<'week' | 'month'>('week')
+  const s       = period === 'week' ? weekSummary : monthSummary
+  const prev    = period === 'week' ? prevWeekSnap : prevMonthSnap
+  const label   = period === 'week' ? 'Week' : 'Month'
+  const labelLc = label.toLowerCase()
+
+  // Days elapsed in current period (for "needs attention" check)
+  const now = new Date()
+  const daysElapsed = period === 'week'
+    ? ((now.getDay() + 6) % 7) + 1   // Mon=1 … Sun=7
+    : now.getDate()
+
+  // Comparison arrow
+  const diff = s.total - prev.total
+  const comparisonText =
+    diff > 0 ? `↑ +${diff} vs last ${labelLc}`
+    : diff < 0 ? `↓ ${diff} vs last ${labelLc}`
+    : `Same as last ${labelLc}`
+  const comparisonColor = diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-slate-400'
+
+  const onTimeRate = pct(s.onTime, s.onTime + s.late)
+
+  // Spotlights
+  const starMember  = s.byMember.find(m => m.completions > 0)
+  const champMember = s.byMember
+    .filter(m => m.onTime + m.late >= 3)
+    .sort((a, b) => pct(b.onTime, b.onTime + b.late) - pct(a.onTime, a.onTime + a.late))[0] ?? null
+  const topCategory = s.byCategory[0] ?? null
+  const pointsLeader = [...s.byMember].sort((a, b) => b.points - a.points).find(m => m.points > 0) ?? null
+
+  const memberColorMap = Object.fromEntries(members.map(m => [m.id, m.color]))
+
+  // Needs attention: members with 0 completions when period is ≥3 days old
+  const needsAttention = daysElapsed >= 3
+    ? s.byMember.filter(m => m.completions === 0)
+    : []
+
+  // Group upcoming chores by relative day
+  const todayStr     = now.toISOString().split('T')[0]
+  const tomorrowStr  = (() => { const d = new Date(now); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
+
+  const groupedUpcoming = useMemo(() => {
+    const groups: { label: string; chores: UpcomingChore[] }[] = []
+    const today: UpcomingChore[]    = []
+    const tomorrow: UpcomingChore[] = []
+    const later: UpcomingChore[]    = []
+    for (const c of upcomingChores) {
+      if (c.dueDate === todayStr)     today.push(c)
+      else if (c.dueDate === tomorrowStr) tomorrow.push(c)
+      else later.push(c)
+    }
+    if (today.length)    groups.push({ label: 'Today',     chores: today })
+    if (tomorrow.length) groups.push({ label: 'Tomorrow',  chores: tomorrow })
+    if (later.length)    groups.push({ label: 'This Week', chores: later })
+    return groups
+  }, [upcomingChores, todayStr, tomorrowStr])
+
+  return (
+    <div className="space-y-5">
+      {/* Period toggle */}
+      <div className="flex justify-end">
+        <div className="flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
+          {(['week', 'month'] as const).map(p => (
+            <button key={p} type="button" onClick={() => setPeriod(p)}
+              className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition
+                ${period === p ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+              {p === 'week' ? 'This Week' : 'This Month'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Header card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm text-center"
+        style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)' }}>
+        <p className="text-3xl mb-1">📊</p>
+        <h2 className="text-base font-bold text-slate-800">{householdName} {label}ly Digest</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Here&apos;s how your household is doing</p>
+      </div>
+
+      {/* Highlight strip */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+          <p className="text-xl font-bold text-slate-900">{s.total}</p>
+          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">done</p>
+          <p className={`text-[10px] font-semibold mt-1 ${comparisonColor}`}>{comparisonText}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+          <p className="text-xl font-bold text-slate-900">
+            {s.onTime + s.late === 0 ? '—' : `${onTimeRate}%`}
+          </p>
+          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">on time</p>
+          <p className="text-[10px] text-slate-400 mt-1">{s.onTime} on time · {s.late} late</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+          <p className="text-xl font-bold text-amber-600">{s.totalPoints}</p>
+          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">pts earned</p>
+          <p className="text-[10px] text-slate-400 mt-1">this {labelLc}</p>
+        </div>
+      </div>
+
+      {/* Spotlight cards */}
+      {(starMember || champMember || topCategory || pointsLeader) && (
+        <div>
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Spotlights</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {starMember && (
+              <SpotlightCard
+                emoji="🌟"
+                title={`Star of the ${label}`}
+                value={starMember.name?.split(' ')[0] ?? 'Unknown'}
+                sub={`${starMember.completions} chores completed`}
+                color={memberColorMap[starMember.userId] ?? starMember.color}
+              />
+            )}
+            {champMember && (
+              <SpotlightCard
+                emoji="⏱️"
+                title="On-time Champion"
+                value={champMember.name?.split(' ')[0] ?? 'Unknown'}
+                sub={`${pct(champMember.onTime, champMember.onTime + champMember.late)}% on time`}
+                color={memberColorMap[champMember.userId] ?? champMember.color}
+              />
+            )}
+            {topCategory && (
+              <SpotlightCard
+                emoji="🏠"
+                title="Top Category"
+                value={CATEGORY_META[topCategory.category]?.label ?? topCategory.category}
+                sub={`${topCategory.count} completions`}
+                color="#6366f1"
+              />
+            )}
+            {pointsLeader && (
+              <SpotlightCard
+                emoji="🔥"
+                title="Points Leader"
+                value={pointsLeader.name?.split(' ')[0] ?? 'Unknown'}
+                sub={`${pointsLeader.points} pts`}
+                color={memberColorMap[pointsLeader.userId] ?? pointsLeader.color}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming chores */}
+      <div>
+        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Upcoming This Week</h3>
+        {upcomingChores.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center">
+            <p className="text-2xl">🎉</p>
+            <p className="mt-1 text-sm font-semibold text-slate-600">Nothing due — enjoy the break!</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {groupedUpcoming.map(group => (
+              <div key={group.label}>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">{group.label}</p>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-50">
+                  {group.chores.map(chore => {
+                    const meta = CATEGORY_META[chore.category] ?? { emoji: '🏠', label: chore.category }
+                    const isToday    = chore.dueDate === todayStr
+                    const isTomorrow = chore.dueDate === tomorrowStr
+                    const dueLabel   = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : formatDate(chore.dueDate)
+                    const priorityConfig: Record<string, { label: string; bg: string; color: string }> = {
+                      high:   { label: 'High',   bg: '#fee2e2', color: '#dc2626' },
+                      medium: { label: 'Medium', bg: '#fef9c3', color: '#a16207' },
+                      low:    { label: 'Low',    bg: '#f0fdf4', color: '#166534' },
+                    }
+                    const pri = priorityConfig[chore.priority] ?? priorityConfig.medium
+                    return (
+                      <div key={chore.id} className="flex items-center gap-3 px-4 py-3">
+                        <span className="text-base flex-shrink-0">{meta.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{chore.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {dueLabel}
+                            {chore.assigneeName ? ` · ${chore.assigneeName === members.find(m => m.id === currentUserId)?.name ? 'You' : chore.assigneeName}` : ''}
+                          </p>
+                        </div>
+                        <span
+                          className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          style={{ background: pri.bg, color: pri.color }}
+                        >
+                          {pri.label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Needs attention */}
+      {needsAttention.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs font-bold text-amber-800 mb-2">👋 Needs Attention</p>
+          <div className="space-y-1">
+            {needsAttention.map(m => (
+              <p key={m.userId} className="text-xs text-amber-700">
+                {m.name ?? 'Unknown'} hasn&apos;t completed any chores this {labelLc}.
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {s.total === 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+          <p className="text-3xl">📬</p>
+          <p className="mt-2 font-semibold text-slate-600">No activity this {labelLc} yet</p>
+          <p className="mt-1 text-sm text-slate-400">Complete some chores and check back here.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SpotlightCard({
+  emoji, title, value, sub, color,
+}: {
+  emoji: string; title: string; value: string; sub: string; color: string
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">{emoji}</span>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      </div>
+      <p className="text-sm font-bold" style={{ color }}>{value}</p>
+      <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // EXPORT TAB
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -771,6 +1189,9 @@ function ExportTab({
     win.document.write(html)
     win.document.close()
   }
+
+  // suppress unused members warning — passed for type safety but not used in export tab directly
+  void members
 
   return (
     <div className="space-y-6">
