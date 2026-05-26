@@ -346,6 +346,18 @@ export async function completeChore(choreId: string, photoProofUrl?: string) {
     })
   }
 
+  // On-time bonus: +5 points for completing on or before due date
+  if (wasOnTime && chore.due_date) {
+    await supabase.from('point_events').insert({
+      user_id:      user.id,
+      household_id: chore.household_id,
+      chore_id:     choreId,
+      chore_name:   'On-time bonus',
+      points:       5,
+      earned_at:    now,
+    })
+  }
+
   // Update streak + check badge milestones (non-blocking)
   await updateStreakAndCheckBadges(supabase, user.id, chore.household_id).catch(() => undefined)
 

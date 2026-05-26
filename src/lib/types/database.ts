@@ -465,6 +465,72 @@ export interface Database {
         Update: Record<string, never>
         Relationships: []
       }
+      rewards_catalog: {
+        Row: {
+          id:           string
+          household_id: string
+          name:         string
+          emoji:        string
+          description:  string | null
+          points_cost:  number
+          is_active:    boolean
+          created_by:   string | null
+          created_at:   string
+        }
+        Insert: {
+          id?:          string
+          household_id: string
+          name:         string
+          emoji?:       string
+          description?: string | null
+          points_cost?: number
+          is_active?:   boolean
+          created_by?:  string | null
+          created_at?:  string
+        }
+        Update: {
+          name?:        string
+          emoji?:       string
+          description?: string | null
+          points_cost?: number
+          is_active?:   boolean
+        }
+        Relationships: []
+      }
+      redemptions: {
+        Row: {
+          id:           string
+          user_id:      string
+          household_id: string
+          reward_id:    string | null
+          reward_name:  string
+          reward_emoji: string
+          points_spent: number
+          status:       'pending' | 'approved' | 'rejected'
+          redeemed_at:  string
+          resolved_at:  string | null
+          resolved_by:  string | null
+        }
+        Insert: {
+          id?:          string
+          user_id:      string
+          household_id: string
+          reward_id?:   string | null
+          reward_name:  string
+          reward_emoji?: string
+          points_spent: number
+          status?:      'pending' | 'approved' | 'rejected'
+          redeemed_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          status?:      'pending' | 'approved' | 'rejected'
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -494,6 +560,8 @@ export type SwapRequestRow      = Database['public']['Tables']['swap_requests'][
 export type PointEventRow       = Database['public']['Tables']['point_events']['Row']
 export type BadgeRow            = Database['public']['Tables']['badges']['Row']
 export type UserStreakRow        = Database['public']['Tables']['user_streaks']['Row']
+export type RewardsCatalogRow   = Database['public']['Tables']['rewards_catalog']['Row']
+export type RedemptionRow       = Database['public']['Tables']['redemptions']['Row']
 
 // ── Enriched / joined types ────────────────────────────────────────────────────
 
@@ -546,6 +614,7 @@ export interface HouseholdSettings {
     high?: number
   }
   notificationsEnabled?: boolean
+  leaderboardHidden?: boolean
 }
 
 // ── History / completion log types ───────────────────────────────────────────

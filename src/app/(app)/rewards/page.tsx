@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import RewardsClient from './RewardsClient'
-import type { BadgeRow, UserRow } from '@/lib/types/database'
+import type { BadgeRow, UserRow, RewardsCatalogRow, RedemptionRow, HouseholdSettings } from '@/lib/types/database'
 
 export const metadata: Metadata = { title: 'Rewards & Badges' }
 export const dynamic = 'force-dynamic'
@@ -16,12 +16,13 @@ export default async function RewardsPage() {
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),
-    supabase.from('household_members').select('household_id, color_theme').eq('user_id', user.id).maybeSingle(),
+    supabase.from('household_members').select('household_id, color_theme, role').eq('user_id', user.id).maybeSingle(),
   ])
   const profile = profileRaw as UserRow | null
 
   if (!membership) redirect('/onboarding')
   const { household_id: householdId } = membership
+  const isAdmin = membership.role === 'admin'
 
   // ── 2. Household member map ───────────────────────────────────────────────
   const { data: memberRowsRaw } = await supabase
@@ -88,6 +89,84 @@ export default async function RewardsPage() {
 
   const allBadges = (allBadgesRaw ?? []) as BadgeRow[]
 
+  // ── 6. Rewards catalog ────────────────────────────────────────────────────
+  const { data: rewardsCatalogRaw } = await supabase
+    .from('rewards_catalog')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+
+  const rewardsCatalog = (rewardsCatalogRaw ?? []) as RewardsCatalogRow[]
+
+  // ── 7. Redemptions ────────────────────────────────────────────────────────
+  const { data: redemptionsRaw } = await supabase
+    .from('redemptions')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('redeemed_at', { ascending: false })
+    .limit(50)
+
+  const redemptions = (redemptionsRaw ?? []) as RedemptionRow[]
+
+  // ── 8. Weekly points leaderboard (Monday–Sunday) ──────────────────────────
+  const now = new Date()
+  // Find the most recent Monday
+  const dayOfWeek = now.getDay() // 0=Sun, 1=Mon, …
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - daysToMonday)
+  monday.setHours(0, 0, 0, 0)
+  const weekStart = monday.toISOString()
+
+  const { data: weeklyPointRowsRaw } = await supabase
+    .from('point_events')
+    .select('user_id, points')
+    .eq('household_id', householdId)
+    .gte('earned_at', weekStart)
+    .gt('points', 0)  // only positive (no spending)
+
+  const weeklyPointRows = (weeklyPointRowsRaw ?? []) as { user_id: string; points: number }[]
+
+  // Sum per user this week
+  const weeklyTotals = new Map<string, number>()
+  for (const r of weeklyPointRows) {
+    weeklyTotals.set(r.user_id, (weeklyTotals.get(r.user_id) ?? 0) + r.points)
+  }
+
+  // ── 9. All-time points per user ───────────────────────────────────────────
+  const { data: allTimePointRowsRaw } = await supabase
+    .from('point_events')
+    .select('user_id, points')
+    .eq('household_id', householdId)
+
+  const allTimePointRows = (allTimePointRowsRaw ?? []) as { user_id: string; points: number }[]
+
+  const allTimeTotals = new Map<string, number>()
+  for (const r of allTimePointRows) {
+    allTimeTotals.set(r.user_id, (allTimeTotals.get(r.user_id) ?? 0) + r.points)
+  }
+
+  // Build leaderboard entries for all members
+  const leaderboard = memberUserIds.map(uid => ({
+    userId:         uid,
+    name:           profileMap[uid]?.full_name ?? null,
+    avatarUrl:      profileMap[uid]?.avatar_url ?? null,
+    color:          colorMap[uid] ?? '#6366f1',
+    pointsThisWeek: weeklyTotals.get(uid) ?? 0,
+    pointsAllTime:  allTimeTotals.get(uid) ?? 0,
+  })).sort((a, b) => b.pointsThisWeek - a.pointsThisWeek)
+
+  // ── 10. Household settings ────────────────────────────────────────────────
+  const { data: householdRaw } = await supabase
+    .from('households')
+    .select('id, settings')
+    .eq('id', householdId)
+    .maybeSingle()
+
+  const householdSettings = (householdRaw?.settings ?? {}) as HouseholdSettings
+  const leaderboardHidden = householdSettings.leaderboardHidden ?? false
+
   return (
     <RewardsClient
       currentUser={profile as UserRow}
@@ -99,6 +178,12 @@ export default async function RewardsPage() {
       colorMap={colorMap}
       allHouseholdBadges={allBadges}
       profileMap={profileMap}
+      rewardsCatalog={rewardsCatalog}
+      redemptions={redemptions}
+      leaderboard={leaderboard}
+      leaderboardHidden={leaderboardHidden}
+      isAdmin={isAdmin}
+      householdId={householdId}
     />
   )
 }
