@@ -105,8 +105,19 @@ export default function CompleteChoreSheet({ chore, onClose, onDone }: CompleteC
         {/* Photo proof section */}
         <div className="px-6 pb-5">
           <p className="mb-2 text-sm font-semibold text-slate-700">
-            Add photo proof <span className="text-xs font-normal text-slate-400">(optional)</span>
+            {chore.require_photo ? (
+              <>
+                <span>📷 Photo proof required</span>
+                <span className="ml-1 text-red-500">*</span>
+              </>
+            ) : (
+              <>Add photo proof <span className="text-xs font-normal text-slate-400">(optional)</span></>
+            )}
           </p>
+
+          {chore.require_photo && !photoFile && (
+            <p className="mb-2 text-xs font-semibold text-red-500">Photo is required for this chore</p>
+          )}
 
           {preview ? (
             <div className="relative mb-3 overflow-hidden rounded-xl">
@@ -129,10 +140,14 @@ export default function CompleteChoreSheet({ chore, onClose, onDone }: CompleteC
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 py-6 text-slate-400 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-500"
+              className={`flex w-full flex-col items-center gap-2 rounded-xl border-2 py-6 transition ${
+                chore.require_photo
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-100'
+                  : 'border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-500'
+              }`}
             >
               <CameraIcon className="h-7 w-7" />
-              <span className="text-sm font-medium">Tap to add photo</span>
+              <span className="text-sm font-medium">{chore.require_photo ? 'Tap to attach photo' : 'Tap to add photo'}</span>
               <span className="text-xs">JPG, PNG, WEBP · max 8 MB</span>
             </button>
           )}
@@ -159,7 +174,7 @@ export default function CompleteChoreSheet({ chore, onClose, onDone }: CompleteC
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isPending}
+            disabled={isPending || (chore.require_photo && !photoFile)}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50"
           >
             {isPending ? (

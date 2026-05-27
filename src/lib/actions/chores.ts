@@ -48,6 +48,9 @@ function parseChoreForm(formData: FormData, allowedCustomCategories: string[] = 
     rotation_members = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
   } catch { rotation_members = [] }
 
+  // Require photo
+  const require_photo = formData.get('require_photo') === 'true'
+
   // Subtasks
   let subtasks: { id: string; title: string; completed: boolean }[] = []
   try {
@@ -80,7 +83,7 @@ function parseChoreForm(formData: FormData, allowedCustomCategories: string[] = 
   return {
     data: {
       name, description, assigned_to, due_date, frequency, priority, category,
-      estimated_mins, points, rotation_enabled, rotation_members, subtasks,
+      estimated_mins, points, rotation_enabled, rotation_members, subtasks, require_photo,
     },
   }
 }

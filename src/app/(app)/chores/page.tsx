@@ -64,6 +64,16 @@ export default async function ChoresPage() {
     assignee: c.assigned_to ? (profileMap[c.assigned_to] ?? null) : null,
   }))
 
+  // ── 3b. Comment counts ────────────────────────────────────────────────────
+  const choreIds = choreRows.map(c => c.id)
+  const { data: commentCountsRaw } = choreIds.length > 0
+    ? await supabase.from('chore_comments').select('chore_id').in('chore_id', choreIds)
+    : { data: [] }
+  const commentCounts: Record<string, number> = {}
+  for (const row of (commentCountsRaw ?? []) as { chore_id: string }[]) {
+    commentCounts[row.chore_id] = (commentCounts[row.chore_id] ?? 0) + 1
+  }
+
   // ── 4. Household settings (for custom categories + point defaults) ───────
   const { data: hhRowRaw } = await supabase
     .from('households')
@@ -115,6 +125,7 @@ export default async function ChoresPage() {
       pendingSwaps={pendingSwaps}
       pointDefaults={hhSettings.pointValues}
       customCategories={hhSettings.customCategories ?? []}
+      commentCounts={commentCounts}
     />
   )
 }

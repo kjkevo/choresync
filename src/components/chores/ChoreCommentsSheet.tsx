@@ -3,7 +3,10 @@
 import { useState, useEffect, useTransition, useRef } from 'react'
 import Image from 'next/image'
 import { getChoreComments, addChoreComment, deleteChoreComment } from '@/lib/actions/comments'
+import { getLatestCompletionForChore, addCompletionReaction, removeCompletionReaction } from '@/lib/actions/reactions'
 import type { ChoreWithAssignee, ChoreCommentWithAuthor } from '@/lib/types/database'
+
+const REACTION_EMOJIS = ['👍', '❤️', '🔥', '🎉', '💪', '😂'] as const
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -30,18 +33,25 @@ interface ChoreCommentsSheetProps {
   isAdmin:       boolean
   colorMap:      Record<string, string>
   onClose:       () => void
+  /** Name of the user who completed the chore (for the completion card) */
+  completedByName?: string | null
 }
 
 export default function ChoreCommentsSheet({
-  chore, currentUserId, isAdmin, colorMap, onClose,
+  chore, currentUserId, isAdmin, colorMap, onClose, completedByName,
 }: ChoreCommentsSheetProps) {
-  const [comments,  setComments]  = useState<ChoreCommentWithAuthor[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [input,     setInput]     = useState('')
-  const [posting,   startPost]    = useTransition()
-  const [error,     setError]     = useState<string | null>(null)
+  const [comments,      setComments]      = useState<ChoreCommentWithAuthor[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [input,         setInput]         = useState('')
+  const [posting,       startPost]        = useTransition()
+  const [error,         setError]         = useState<string | null>(null)
+  const [completionId,  setCompletionId]  = useState<string | null>(null)
+  const [reactions,     setReactions]     = useState<{ emoji: string; userId: string }[]>([])
+  const [pickerOpen,    setPickerOpen]    = useState(false)
+  const [, startReact]                    = useTransition()
   const inputRef  = useRef<HTMLTextAreaElement>(null)
   const startY    = useRef<number | null>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   // Load comments on mount
   useEffect(() => {
@@ -50,6 +60,29 @@ export default function ChoreCommentsSheet({
       setLoading(false)
     })
   }, [chore.id])
+
+  // Load completion + reactions if chore is completed
+  useEffect(() => {
+    if (chore.status !== 'completed') return
+    getLatestCompletionForChore(chore.id).then(res => {
+      if (res.completionId) {
+        setCompletionId(res.completionId)
+        setReactions(res.reactions)
+      }
+    })
+  }, [chore.id, chore.status])
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!pickerOpen) return
+    function handleClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [pickerOpen])
 
   // Focus input after open
   useEffect(() => {
@@ -88,6 +121,25 @@ export default function ChoreCommentsSheet({
           author: null,   // will be correct after next reload
         }
         setComments(prev => [...prev, optimistic])
+      }
+    })
+  }
+
+  function handleReactionToggle(emoji: string) {
+    if (!completionId) return
+    const alreadyReacted = reactions.some(r => r.emoji === emoji && r.userId === currentUserId)
+    // Optimistic
+    if (alreadyReacted) {
+      setReactions(prev => prev.filter(r => !(r.emoji === emoji && r.userId === currentUserId)))
+    } else {
+      setReactions(prev => [...prev, { emoji, userId: currentUserId }])
+    }
+    startReact(async () => {
+      if (alreadyReacted) {
+        await removeCompletionReaction(completionId, emoji)
+      } else {
+        // We need household_id — get it from the chore
+        await addCompletionReaction(completionId, emoji, chore.household_id)
       }
     })
   }
@@ -137,6 +189,113 @@ export default function ChoreCommentsSheet({
 
         {/* Comments list */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {/* Completion event card */}
+          {chore.status === 'completed' && chore.completed_by && (
+            <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ background: colorMap[chore.completed_by] ?? '#10b981' }}
+                >
+                  {chore.assignee?.avatar_url ? (
+                    <Image
+                      src={chore.assignee.avatar_url}
+                      alt={chore.assignee.full_name ?? ''}
+                      width={36} height={36}
+                      className="h-full w-full rounded-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    initials(completedByName ?? chore.assignee?.full_name ?? null)
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-emerald-800">
+                    {chore.completed_by === currentUserId
+                      ? 'You'
+                      : (completedByName ?? 'A member')}{' '}
+                    marked this done ✅
+                  </p>
+                  {chore.completed_at && (
+                    <p className="text-xs text-emerald-600">{formatTime(chore.completed_at)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Photo proof thumbnail */}
+              {chore.photo_proof_url && (
+                <a href={chore.photo_proof_url} target="_blank" rel="noopener noreferrer" className="mt-3 block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={chore.photo_proof_url}
+                    alt="Photo proof"
+                    className="max-h-40 w-full rounded-xl object-cover"
+                  />
+                </a>
+              )}
+
+              {/* Reaction bar */}
+              {completionId && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {/* Grouped reaction pills */}
+                  {(() => {
+                    const grouped: Record<string, string[]> = {}
+                    for (const r of reactions) {
+                      ;(grouped[r.emoji] ??= []).push(r.userId)
+                    }
+                    return Object.entries(grouped).map(([emoji, users]) => {
+                      const mine = users.includes(currentUserId)
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReactionToggle(emoji)}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition ${
+                            mine
+                              ? 'border-indigo-300 bg-indigo-100 text-indigo-700'
+                              : 'border-slate-200 bg-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50'
+                          }`}
+                        >
+                          {emoji} {users.length}
+                        </button>
+                      )
+                    })
+                  })()}
+
+                  {/* Picker */}
+                  <div ref={pickerRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen(v => !v)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-sm text-slate-400 transition hover:bg-slate-100"
+                      aria-label="Add reaction"
+                    >
+                      +
+                    </button>
+                    {pickerOpen && (
+                      <div className="absolute bottom-8 left-0 z-50 flex gap-1 rounded-2xl border border-slate-100 bg-white p-2 shadow-lg">
+                        {REACTION_EMOJIS.map(emoji => {
+                          const mine = reactions.some(r => r.emoji === emoji && r.userId === currentUserId)
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => { setPickerOpen(false); handleReactionToggle(emoji) }}
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg transition ${mine ? 'bg-indigo-100' : 'hover:bg-slate-100'}`}
+                              aria-label={`React with ${emoji}`}
+                            >
+                              {emoji}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600" />

@@ -1,14 +1,20 @@
 'use client'
 
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useTransition, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { completeChore } from '@/lib/actions/chores'
+import { addCompletionReaction, removeCompletionReaction } from '@/lib/actions/reactions'
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
 import { CATEGORY_META } from '@/components/chores/ChoreModal'
 import type { ChoreWithAssignee, UserRow } from '@/lib/types/database'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ReactionEntry {
+  emoji:  string
+  userId: string
+}
 
 export interface ActivityEntry {
   id:          string
@@ -17,6 +23,7 @@ export interface ActivityEntry {
   completedAt: string
   points:      number
   wasOnTime:   boolean | null
+  reactions:   ReactionEntry[]
   member: {
     id:       string
     name:     string | null
@@ -24,6 +31,8 @@ export interface ActivityEntry {
     color:    string
   } | null
 }
+
+const REACTION_EMOJIS = ['👍', '❤️', '🔥', '🎉', '💪', '😂'] as const
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,15 +93,17 @@ export default function DashboardClient({
   myOverdueChores:    initialOverdue,
   myTodayChores:      initialToday,
   householdName,
+  householdId,
   colorMap,
   myStreak,
   pinnedAnnouncements,
-  recentActivity,
+  recentActivity:     initialActivity,
   allHouseholds = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const [overdueChores,  setOverdueChores]  = useState(initialOverdue)
   const [todayChores,    setTodayChores]    = useState(initialToday)
+  const [recentActivity, setRecentActivity] = useState(initialActivity)
   const [completeSheet,  setCompleteSheet]  = useState<ChoreWithAssignee | null>(null)
   const [quickPending,   setQuickPending]   = useState<Set<string>>(new Set())
   const [dismissedPins,  setDismissedPins]  = useState<Set<string>>(new Set())
@@ -119,6 +130,26 @@ export default function DashboardClient({
   function handleSheetDone(choreId: string) {
     removeFromLists(choreId)
     router.refresh()
+  }
+
+  function handleReactionToggle(completionId: string, emoji: string, alreadyReacted: boolean) {
+    // Optimistic update
+    setRecentActivity(prev => prev.map(item => {
+      if (item.id !== completionId) return item
+      if (alreadyReacted) {
+        return { ...item, reactions: item.reactions.filter(r => !(r.emoji === emoji && r.userId === currentUser.id)) }
+      } else {
+        return { ...item, reactions: [...item.reactions, { emoji, userId: currentUser.id }] }
+      }
+    }))
+    // Server call (fire and forget — optimistic state is the truth)
+    startTransition(async () => {
+      if (alreadyReacted) {
+        await removeCompletionReaction(completionId, emoji)
+      } else {
+        await addCompletionReaction(completionId, emoji, householdId)
+      }
+    })
   }
 
   return (
@@ -347,6 +378,8 @@ export default function DashboardClient({
                     item={item}
                     isLast={i === recentActivity.length - 1}
                     isMe={item.member?.id === currentUser.id}
+                    currentUserId={currentUser.id}
+                    onReactionToggle={handleReactionToggle}
                   />
                 ))}
               </div>
@@ -536,58 +569,161 @@ function DoneButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function ActivityRow({ item, isLast, isMe }: { item: ActivityEntry; isLast: boolean; isMe: boolean }) {
+function ActivityRow({
+  item, isLast, isMe, currentUserId, onReactionToggle,
+}: {
+  item:              ActivityEntry
+  isLast:            boolean
+  isMe:              boolean
+  currentUserId:     string
+  onReactionToggle:  (completionId: string, emoji: string, alreadyReacted: boolean) => void
+}) {
   const catMeta     = (CATEGORY_META as Record<string, { emoji: string }>)[item.category] ?? { emoji: '🧹' }
   const displayName = isMe ? 'You' : (item.member?.name?.split(' ')[0] ?? 'Someone')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    function handleClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [pickerOpen])
+
+  // Group reactions by emoji
+  const grouped: Record<string, string[]> = {}
+  for (const r of item.reactions) {
+    ;(grouped[r.emoji] ??= []).push(r.userId)
+  }
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
       padding: '13px 16px',
       borderBottom: isLast ? 'none' : '1px solid #F7F8FA',
     }}>
-      {/* Member avatar */}
-      <div style={{
-        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-        background: item.member?.color ?? '#E5E7EB',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 13, fontWeight: 700, color: '#fff',
-        overflow: 'hidden',
-      }}>
-        {item.member?.avatarUrl ? (
-          <Image
-            src={item.member.avatarUrl}
-            alt={item.member.name ?? ''}
-            width={38} height={38}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            unoptimized
-          />
-        ) : (
-          initials(item.member?.name ?? null)
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Member avatar */}
+        <div style={{
+          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+          background: item.member?.color ?? '#E5E7EB',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, fontWeight: 700, color: '#fff',
+          overflow: 'hidden',
+        }}>
+          {item.member?.avatarUrl ? (
+            <Image
+              src={item.member.avatarUrl}
+              alt={item.member.name ?? ''}
+              width={38} height={38}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              unoptimized
+            />
+          ) : (
+            initials(item.member?.name ?? null)
+          )}
+        </div>
+
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 800, color: isMe ? '#FF6B2B' : '#111827' }}>
+              {displayName}
+            </span>
+            {' '}completed{' '}
+            <span style={{ fontWeight: 700 }}>{catMeta.emoji} {item.choreName}</span>
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>{timeAgo(item.completedAt)}</span>
+            {item.points > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: '#B45309',
+                background: '#FFFBEB', borderRadius: 99, padding: '1px 7px',
+              }}>
+                +{item.points} pts
+              </span>
+            )}
+            {item.wasOnTime === false && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444' }}>late</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Text */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.45 }}>
-          <span style={{ fontWeight: 800, color: isMe ? '#FF6B2B' : '#111827' }}>
-            {displayName}
-          </span>
-          {' '}completed{' '}
-          <span style={{ fontWeight: 700 }}>{catMeta.emoji} {item.choreName}</span>
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{timeAgo(item.completedAt)}</span>
-          {item.points > 0 && (
-            <span style={{
-              fontSize: 11, fontWeight: 700, color: '#B45309',
-              background: '#FFFBEB', borderRadius: 99, padding: '1px 7px',
+      {/* Reaction bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, marginLeft: 50, position: 'relative' }}>
+        {Object.entries(grouped).map(([emoji, users]) => {
+          const mine = users.includes(currentUserId)
+          return (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onReactionToggle(item.id, emoji, mine)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                borderRadius: 99, border: 'none', cursor: 'pointer',
+                padding: '2px 7px', fontSize: 12, fontWeight: 700,
+                background: mine ? '#EEF2FF' : '#F3F4F6',
+                color: mine ? '#4338CA' : '#6B7280',
+                transition: 'background 0.15s',
+              }}
+            >
+              {emoji} {users.length}
+            </button>
+          )
+        })}
+
+        {/* Add reaction "+" button */}
+        <div ref={pickerRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(v => !v)}
+            style={{
+              width: 26, height: 26, borderRadius: '50%', border: 'none',
+              background: 'none', cursor: 'pointer', fontSize: 14, color: '#9CA3AF',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#F3F4F6' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+            aria-label="Add reaction"
+          >
+            +
+          </button>
+
+          {pickerOpen && (
+            <div style={{
+              position: 'absolute', bottom: 30, left: 0, zIndex: 60,
+              background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+              border: '1px solid #F0F0F0', padding: '6px 8px',
+              display: 'flex', gap: 4,
             }}>
-              +{item.points} pts
-            </span>
-          )}
-          {item.wasOnTime === false && (
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444' }}>late</span>
+              {REACTION_EMOJIS.map(emoji => {
+                const mine = (grouped[emoji] ?? []).includes(currentUserId)
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => { setPickerOpen(false); onReactionToggle(item.id, emoji, mine) }}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8, border: 'none',
+                      background: mine ? '#EEF2FF' : 'none',
+                      cursor: 'pointer', fontSize: 18,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => { if (!mine) (e.currentTarget as HTMLButtonElement).style.background = '#F9FAFB' }}
+                    onMouseLeave={e => { if (!mine) (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                    aria-label={`React with ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>

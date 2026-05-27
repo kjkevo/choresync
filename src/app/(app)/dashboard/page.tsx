@@ -10,6 +10,7 @@ import type {
   AnnouncementWithAuthor,
   ChoreCompletionRow,
 } from '@/lib/types/database'
+import type { ReactionEntry } from './DashboardClient'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
@@ -180,6 +181,20 @@ export default async function DashboardPage({
     .order('completed_at', { ascending: false })
     .limit(15)
 
+  const completionIds = ((completionsRaw ?? []) as ChoreCompletionRow[]).map(r => r.id)
+  const { data: reactionsRaw } = completionIds.length > 0
+    ? await supabase
+        .from('chore_completion_reactions')
+        .select('completion_id, user_id, emoji')
+        .in('completion_id', completionIds)
+    : { data: [] }
+
+  // Group by completion_id
+  const reactionsByCompletion: Record<string, ReactionEntry[]> = {}
+  for (const r of (reactionsRaw ?? []) as { completion_id: string; user_id: string; emoji: string }[]) {
+    ;(reactionsByCompletion[r.completion_id] ??= []).push({ emoji: r.emoji, userId: r.user_id })
+  }
+
   const recentActivity: ActivityEntry[] = ((completionsRaw ?? []) as ChoreCompletionRow[]).map(row => ({
     id:          row.id,
     choreName:   row.chore_name,
@@ -187,6 +202,7 @@ export default async function DashboardPage({
     completedAt: row.completed_at,
     points:      row.points,
     wasOnTime:   row.was_on_time,
+    reactions:   reactionsByCompletion[row.id] ?? [],
     member: profileMap[row.completed_by]
       ? {
           id:        row.completed_by,

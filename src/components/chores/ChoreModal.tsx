@@ -78,6 +78,9 @@ export default function ChoreModal({
     if (!pointsEdited) setPoints(PRIORITY_POINTS[priority])
   }, [priority]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Require photo
+  const [requirePhoto, setRequirePhoto] = useState<boolean>(chore?.require_photo ?? false)
+
   // Rotation
   const existingMembers = Array.isArray(chore?.rotation_members)
     ? (chore.rotation_members as unknown as string[])
@@ -157,6 +160,7 @@ export default function ChoreModal({
     fd.set('rotation_enabled', String(rotationEnabled))
     fd.set('rotation_members', JSON.stringify(rotationMembers))
     fd.set('subtasks', JSON.stringify(subtasks))
+    fd.set('require_photo', String(requirePhoto))
 
     startTransition(async () => {
       const result = isEdit
@@ -318,6 +322,26 @@ export default function ChoreModal({
                     className="input"
                   />
                 </div>
+              </div>
+
+              {/* Require photo toggle */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setRequirePhoto(v => !v)}
+                  className="flex w-full items-center justify-between px-4 py-3"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg leading-none">📷</span>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-slate-900">Require photo proof</p>
+                      <p className="text-xs text-slate-400">Members must attach a photo when marking this done</p>
+                    </div>
+                  </div>
+                  <div className={`relative h-6 w-10 flex-shrink-0 rounded-full transition-colors ${requirePhoto ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${requirePhoto ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
               </div>
 
               {/* Points */}

@@ -107,6 +107,7 @@ export interface Database {
           rotation_index: number
           points: number                   // 0–100
           subtasks: Json
+          require_photo: boolean
         }
         Insert: {
           id?: string
@@ -132,6 +133,7 @@ export interface Database {
           rotation_index?: number
           points?: number
           subtasks?: Json
+          require_photo?: boolean
         }
         Update: {
           name?: string
@@ -153,6 +155,7 @@ export interface Database {
           rotation_index?: number
           points?: number
           subtasks?: Json
+          require_photo?: boolean
         }
         Relationships: []
       }
@@ -332,6 +335,12 @@ export interface Database {
         Update: {
           emoji?: string
         }
+        Relationships: []
+      }
+      chore_completion_reactions: {
+        Row: { id: string; completion_id: string; user_id: string; household_id: string; emoji: string; created_at: string }
+        Insert: { id?: string; completion_id: string; user_id: string; household_id: string; emoji: string; created_at?: string }
+        Update: Record<string, never>
         Relationships: []
       }
       chore_comments: {
@@ -562,6 +571,7 @@ export type BadgeRow            = Database['public']['Tables']['badges']['Row']
 export type UserStreakRow        = Database['public']['Tables']['user_streaks']['Row']
 export type RewardsCatalogRow   = Database['public']['Tables']['rewards_catalog']['Row']
 export type RedemptionRow       = Database['public']['Tables']['redemptions']['Row']
+export type ChoreCompletionReactionRow = Database['public']['Tables']['chore_completion_reactions']['Row']
 
 // ── Enriched / joined types ────────────────────────────────────────────────────
 

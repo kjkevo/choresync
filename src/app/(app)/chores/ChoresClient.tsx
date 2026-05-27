@@ -44,6 +44,7 @@ interface ChoresClientProps {
   pendingSwaps:     SwapRequestWithDetails[]
   pointDefaults?:   { low?: number; medium?: number; high?: number }
   customCategories?: string[]
+  commentCounts?:   Record<string, number>
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ export default function ChoresClient({
   pendingSwaps: initialPendingSwaps,
   pointDefaults,
   customCategories = [],
+  commentCounts = {},
 }: ChoresClientProps) {
   const router = useRouter()
 
@@ -347,6 +349,11 @@ export default function ChoresClient({
           isAdmin={isAdmin}
           colorMap={colorMap}
           onClose={() => setNotesChore(null)}
+          completedByName={
+            notesChore.completed_by
+              ? (members.find(m => m.id === notesChore.completed_by)?.full_name ?? null)
+              : null
+          }
         />
       )}
 
@@ -548,6 +555,7 @@ export default function ChoresClient({
         currentUserId={currentUserId}
         assigneeColor={c.assigned_to ? colorMap[c.assigned_to] : undefined}
         nextUpAssignee={getNextUp(c)}
+        commentCount={commentCounts[c.id] ?? 0}
         onComplete={setCompleteChore}
         onEdit={isAdmin ? ch => setModalChore(ch) : undefined}
         onDelete={isAdmin ? setConfirmDelete : undefined}
