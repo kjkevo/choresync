@@ -7,6 +7,7 @@ import { completeChore } from '@/lib/actions/chores'
 import { addCompletionReaction, removeCompletionReaction } from '@/lib/actions/reactions'
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
 import { CATEGORY_META } from '@/components/chores/ChoreModal'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 import type { ChoreWithAssignee, UserRow } from '@/lib/types/database'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,10 +37,9 @@ const REACTION_EMOJIS = ['👍', '❤️', '🔥', '🎉', '💪', '😂'] as co
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function greeting(name: string | null) {
+function greetingKey(): 'goodMorning' | 'goodAfternoon' | 'goodEvening' {
   const h = new Date().getHours()
-  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
-  return `Good ${part}, ${name?.split(' ')[0] ?? 'there'} 👋`
+  return h < 12 ? 'goodMorning' : h < 17 ? 'goodAfternoon' : 'goodEvening'
 }
 
 function initials(name: string | null) {
@@ -101,6 +101,7 @@ export default function DashboardClient({
   allHouseholds = [],
 }: DashboardClientProps) {
   const router = useRouter()
+  const { t } = useLanguage()
   const [overdueChores,  setOverdueChores]  = useState(initialOverdue)
   const [todayChores,    setTodayChores]    = useState(initialToday)
   const [recentActivity, setRecentActivity] = useState(initialActivity)
@@ -255,7 +256,7 @@ export default function DashboardClient({
               fontFamily: '"Poppins", sans-serif', fontWeight: 800,
               fontSize: 25, color: '#111827', margin: 0, letterSpacing: '-0.4px',
             }}>
-              {greeting(currentUser.full_name)}
+              {t(greetingKey())}, {currentUser.full_name?.split(' ')[0] ?? 'there'} 👋
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
               <p style={{ margin: 0, fontSize: 14, color: '#6B7280' }}>
@@ -307,7 +308,7 @@ export default function DashboardClient({
           {/* ── Overdue ──────────────────────────────────────────────────────── */}
           {overdueChores.length > 0 && (
             <section style={{ marginBottom: 16 }}>
-              <SectionTitle icon="⚠️" label="Overdue" count={overdueChores.length} color="#EF4444" />
+              <SectionTitle icon="⚠️" label={t('overdue')} count={overdueChores.length} color="#EF4444" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {overdueChores.map(chore => (
                   <ChoreCard
@@ -317,6 +318,7 @@ export default function DashboardClient({
                     pending={quickPending.has(chore.id)}
                     onQuickComplete={() => handleQuickComplete(chore)}
                     onDone={() => setCompleteSheet(chore)}
+                    markDoneLabel={t('markDone')}
                   />
                 ))}
               </div>
@@ -325,7 +327,7 @@ export default function DashboardClient({
 
           {/* ── Today ────────────────────────────────────────────────────────── */}
           <section style={{ marginBottom: 20 }}>
-            <SectionTitle icon="📋" label="Due Today" count={todayChores.length} color="#FF6B2B" />
+            <SectionTitle icon="📋" label={t('dueToday')} count={todayChores.length} color="#FF6B2B" />
             {todayChores.length === 0 ? (
               <div style={{
                 background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
@@ -333,7 +335,7 @@ export default function DashboardClient({
               }}>
                 <div style={{ fontSize: 32, marginBottom: 10 }}>✅</div>
                 <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15, color: '#374151', margin: 0 }}>
-                  {overdueChores.length > 0 ? 'No new chores today' : 'Nothing due today'}
+                  {overdueChores.length > 0 ? t('noChores') : t('nothingDueToday')}
                 </p>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: '6px 0 0' }}>
                   Check the{' '}
@@ -351,6 +353,7 @@ export default function DashboardClient({
                     pending={quickPending.has(chore.id)}
                     onQuickComplete={() => handleQuickComplete(chore)}
                     onDone={() => setCompleteSheet(chore)}
+                    markDoneLabel={t('markDone')}
                   />
                 ))}
               </div>
@@ -449,12 +452,13 @@ const PRIORITY_BAR: Record<string, string> = {
   high:   '#EF4444',
 }
 
-function ChoreCard({ chore, variant, pending, onQuickComplete, onDone }: {
+function ChoreCard({ chore, variant, pending, onQuickComplete, onDone, markDoneLabel }: {
   chore:           ChoreWithAssignee
   variant:         'overdue' | 'today'
   pending:         boolean
   onQuickComplete: () => void
   onDone:          () => void
+  markDoneLabel?:  string
 }) {
   const catMeta     = CATEGORY_META[chore.category]
   const isRecurring = chore.frequency !== 'one-time'
@@ -479,7 +483,7 @@ function ChoreCard({ chore, variant, pending, onQuickComplete, onDone }: {
         type="button"
         onClick={onQuickComplete}
         disabled={pending}
-        aria-label="Mark done"
+        aria-label={markDoneLabel ?? 'Mark done'}
         style={{
           marginLeft: 14, flexShrink: 0,
           width: 28, height: 28, borderRadius: '50%',
@@ -536,12 +540,12 @@ function ChoreCard({ chore, variant, pending, onQuickComplete, onDone }: {
       </div>
 
       {/* Done button */}
-      <DoneButton onClick={onDone} />
+      <DoneButton onClick={onDone} label={markDoneLabel} />
     </div>
   )
 }
 
-function DoneButton({ onClick }: { onClick: () => void }) {
+function DoneButton({ onClick, label }: { onClick: () => void; label?: string }) {
   const [hovered, setHovered] = useState(false)
   const [pressed, setPressed] = useState(false)
   return (
@@ -564,7 +568,7 @@ function DoneButton({ onClick }: { onClick: () => void }) {
         transition: 'background 0.15s, transform 0.1s',
       }}
     >
-      Done
+      {label ?? 'Done'}
     </button>
   )
 }

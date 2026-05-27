@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useTheme } from '@/lib/contexts/ThemeContext'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 import {
   updateHouseholdSettings,
   addCustomCategory,
@@ -86,7 +87,8 @@ export default function SettingsClient({
   currentUserRole,
 }: Props) {
   const isAdmin = currentUserRole === 'admin'
-  const { theme, isDark, setTheme } = useTheme()
+  const { theme, isDark, setTheme, highContrast, setHighContrast } = useTheme()
+  const { locale, setLocale } = useLanguage()
 
   // ── Section scroll spy ────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<SectionId>('appearance')
@@ -610,6 +612,49 @@ export default function SettingsClient({
                     </span>
                   </div>
                 </div>
+
+                {/* Language picker */}
+                <div>
+                  <h3 className="font-semibold mb-1">🌐 Language</h3>
+                  <p className="text-sm mb-3" style={{ color: 'var(--cs-muted)' }}>
+                    Select your preferred language.
+                  </p>
+                  <div className="flex gap-3">
+                    {([
+                      { key: 'en' as const, label: '🇺🇸 English' },
+                      { key: 'es' as const, label: '🇪🇸 Español' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setLocale(opt.key)}
+                        className={`flex-1 rounded-xl border-2 py-3 text-sm font-semibold transition-all ${
+                          locale === opt.key
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
+                            : 'border-transparent hover:border-slate-300'
+                        }`}
+                        style={locale !== opt.key ? { background: 'var(--cs-inset)', color: 'var(--cs-muted)' } : {}}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* High contrast toggle */}
+                <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3"
+                  style={{ background: 'var(--cs-inset)', border: '1px solid var(--cs-border)' }}>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--cs-text)' }}>⚡ High Contrast</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--cs-muted)' }}>Increase contrast for better visibility.</p>
+                  </div>
+                  <Toggle
+                    checked={highContrast}
+                    onChange={() => setHighContrast(!highContrast)}
+                    label=""
+                    ariaLabel="Toggle high contrast mode"
+                  />
+                </div>
               </div>
             </section>
 
@@ -696,6 +741,7 @@ export default function SettingsClient({
                           checked={dbPrefs[row.key]}
                           onChange={() => toggleDbPref(row.key)}
                           label=""
+                          ariaLabel={`Toggle ${row.label}`}
                         />
                       </div>
                     ))}
@@ -906,13 +952,14 @@ export default function SettingsClient({
 
 // ── Toggle sub-component ──────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+function Toggle({ checked, onChange, label, ariaLabel }: { checked: boolean; onChange: () => void; label: string; ariaLabel?: string }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={ariaLabel ?? label ?? undefined}
         onClick={onChange}
         className={`toggle ${checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
       >
@@ -921,7 +968,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () =
           aria-hidden
         />
       </button>
-      <span className="text-sm font-medium" style={{ color: 'var(--cs-text)' }}>{label}</span>
+      {label && <span className="text-sm font-medium" style={{ color: 'var(--cs-text)' }}>{label}</span>}
     </label>
   )
 }

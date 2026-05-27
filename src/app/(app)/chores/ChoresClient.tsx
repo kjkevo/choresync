@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 import ChoreCard from '@/components/chores/ChoreCard'
 import ChoreModal, { CATEGORY_META } from '@/components/chores/ChoreModal'
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
@@ -68,6 +69,7 @@ export default function ChoresClient({
   commentCounts = {},
 }: ChoresClientProps) {
   const router = useRouter()
+  const { t } = useLanguage()
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [chores,        setChores]        = useState<ChoreWithAssignee[]>(initialChores)
@@ -406,7 +408,7 @@ export default function ChoresClient({
                   onClick={() => setModalChore('new')}
                   className="flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
                 >
-                  <PlusIcon className="h-4 w-4" /> New Chore
+                  <PlusIcon className="h-4 w-4" /> {t('create')}
                 </button>
               </div>
             )}
@@ -455,9 +457,16 @@ export default function ChoresClient({
 
         {/* Filter chips */}
         <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {FILTER_LABELS.map(({ key, label, emoji }) => {
+          {FILTER_LABELS.map(({ key, emoji }) => {
             const count = counts[key]
             const active = filter === key
+            const labelMap: Record<FilterKey, string> = {
+              all:       'All',
+              mine:      'Mine',
+              today:     t('today'),
+              overdue:   t('overdue'),
+              completed: t('completed'),
+            }
             return (
               <button
                 key={key}
@@ -472,7 +481,7 @@ export default function ChoresClient({
                 `}
               >
                 <span>{emoji}</span>
-                {label}
+                {labelMap[key]}
                 {count > 0 && (
                   <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
                     {count}

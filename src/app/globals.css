@@ -241,4 +241,50 @@
   .stagger > *:nth-child(3) { animation-delay: 100ms; }
   .stagger > *:nth-child(4) { animation-delay: 150ms; }
   .stagger > *:nth-child(5) { animation-delay: 200ms; }
+
+  /* ── Skip navigation ─────────────────────────────────────────────────────── */
+  .skip-nav {
+    @apply absolute -translate-y-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-transform;
+  }
+  .skip-nav:focus {
+    @apply translate-y-0;
+  }
+}
+
+/* ── High-contrast mode ──────────────────────────────────────────────────── */
+html.high-contrast {
+  --cs-bg:      #000000;
+  --cs-surface: #000000;
+  --cs-border:  #ffffff;
+  --cs-text:    #ffffff;
+  --cs-muted:   #ffff00;
+  --cs-inset:   #1a1a1a;
+  color-scheme: dark;
+}
+html.high-contrast .btn-primary {
+  @apply bg-white text-black border-2 border-white;
+}
+html.high-contrast .btn-ghost {
+  @apply border-white text-white;
+}
+html.high-contrast :focus-visible {
+  @apply ring-4 ring-yellow-400 ring-offset-black;
+}
+
+/* ── Windows High Contrast mode ─────────────────────────────────────────── */
+@media (forced-colors: active) {
+  .btn-primary, .btn-ghost, .btn-danger {
+    forced-color-adjust: none;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
+
+/* ── Tap targets & utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  .tap-target {
+    min-height: 44px;
+    min-width:  44px;
+  }
 }

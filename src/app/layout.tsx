@@ -29,6 +29,9 @@ const THEME_SCRIPT = `
     if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     }
+    if (localStorage.getItem('cs-high-contrast') === 'true') {
+      document.documentElement.classList.add('high-contrast');
+    }
   } catch(e) {}
 })();
 `
