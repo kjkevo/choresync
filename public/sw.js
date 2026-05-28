@@ -67,10 +67,18 @@ self.addEventListener('notificationclick', e => {
   e.notification.close()
   const url = e.notification.data?.url ?? '/'
   e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
       const existing = list.find(c => c.url.includes(self.location.origin))
-      if (existing) { existing.focus(); existing.navigate(url) }
-      else self.clients.openWindow(url)
+      if (existing) {
+        try {
+          await existing.focus()
+          await existing.navigate(url)
+          return
+        } catch {
+          // navigate() failed (e.g. cross-origin or non-navigable client) — fall through to openWindow
+        }
+      }
+      return self.clients.openWindow(url)
     })
   )
 })

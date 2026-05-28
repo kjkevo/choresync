@@ -114,7 +114,7 @@ export async function GET(
     'END:VCALENDAR',
   ].filter(Boolean).join('\r\n')
 
-  return new Response(cal, {
+  return new Response(cal + '\r\n', {
     status: 200,
     headers: {
       'Content-Type':        'text/calendar; charset=utf-8',

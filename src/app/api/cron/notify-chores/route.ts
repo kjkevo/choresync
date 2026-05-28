@@ -20,9 +20,11 @@ function getAdminClient() {
 }
 
 export async function GET(req: Request) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Vercel cron jobs send the secret as: Authorization: Bearer <CRON_SECRET>
+  const authHeader = req.headers.get('authorization')
+  const secret = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!secret || secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 401 })
   }
 
   const db = getAdminClient()

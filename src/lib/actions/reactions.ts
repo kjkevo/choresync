@@ -31,8 +31,8 @@ export async function addCompletionReaction(
     .from('chore_completion_reactions')
     .insert({ completion_id: completionId, user_id: user.id, household_id: householdId, emoji })
 
-  // Ignore unique-constraint violations (already reacted)
-  if (error && !error.message.includes('unique')) {
+  // Ignore unique-constraint violations (already reacted) — Postgres code 23505
+  if (error && (error as { code?: string }).code !== '23505') {
     return { error: error.message }
   }
   return {}

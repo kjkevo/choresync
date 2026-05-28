@@ -79,6 +79,10 @@ export async function notifyAssigned(opts: {
   choreName:    string
   assignerName: string
 }): Promise<void> {
+  // Guard: skip silently if VAPID credentials are not configured
+  if (!process.env.VAPID_EMAIL || !process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    return
+  }
   try {
     const { createClient } = await import('@supabase/supabase-js')
     const db = createClient(
