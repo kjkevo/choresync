@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: '/social',    label: '💬'       },
   { href: '/history',   label: '📊'       },
   { href: '/rewards',   label: '🏆'       },
+  { href: '/supplies',  label: '🛒'      },
   { href: '/household', label: 'House'    },
   { href: '/settings',  label: '⚙️', active: true },
   { href: '/profile',   label: 'Profile'  },
@@ -53,6 +54,7 @@ interface Props {
 const SECTIONS = [
   { id: 'household',    label: '🏠 Household',     adminOnly: true  },
   { id: 'appearance',   label: '🎨 Appearance',    adminOnly: false },
+  { id: 'calendar',     label: '📅 Calendar',      adminOnly: false },
   { id: 'notifications',label: '🔔 Notifications', adminOnly: false },
   { id: 'danger',       label: '⚠️ Danger Zone',   adminOnly: false },
 ] as const
@@ -89,6 +91,17 @@ export default function SettingsClient({
   const isAdmin = currentUserRole === 'admin'
   const { theme, isDark, setTheme, highContrast, setHighContrast } = useTheme()
   const { locale, setLocale } = useLanguage()
+
+  // ── Calendar copy ─────────────────────────────────────────────────────────
+  const [icalCopied, setIcalCopied] = useState(false)
+  function copyIcalUrl() {
+    if (typeof window === 'undefined') return
+    const url = `${window.location.origin}/api/ical/${householdId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setIcalCopied(true)
+      setTimeout(() => setIcalCopied(false), 2000)
+    })
+  }
 
   // ── Section scroll spy ────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState<SectionId>('appearance')
@@ -655,6 +668,77 @@ export default function SettingsClient({
                     ariaLabel="Toggle high contrast mode"
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* ════════════════════════════════════════════════════════════
+                SECTION: Calendar
+            ════════════════════════════════════════════════════════════ */}
+            <section id="calendar" className="scroll-mt-24 space-y-4">
+              <h2 className="section-title">📅 Calendar</h2>
+              <div className="card space-y-4">
+                <div>
+                  <h3 className="font-semibold">Sync with your calendar app</h3>
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--cs-muted)' }}>
+                    Subscribe to get household chores as calendar events — updates automatically.
+                  </p>
+                </div>
+
+                {/* URL display */}
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 font-mono text-xs overflow-hidden"
+                  style={{ background: 'var(--cs-inset)', border: '1px solid var(--cs-border)' }}>
+                  <span className="flex-1 truncate" style={{ color: 'var(--cs-muted)' }}>
+                    {typeof window !== 'undefined'
+                      ? `${window.location.origin}/api/ical/${householdId}`
+                      : `/api/ical/${householdId}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyIcalUrl}
+                    aria-label="Copy calendar subscription URL"
+                    className="flex-shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all"
+                    style={{
+                      background: icalCopied ? '#dcfce7' : 'var(--cs-surface)',
+                      color: icalCopied ? '#16a34a' : 'var(--cs-text)',
+                      border: '1px solid var(--cs-border)',
+                    }}
+                  >
+                    {icalCopied ? '✓ Copied' : '📋 Copy'}
+                  </button>
+                </div>
+
+                {/* Calendar buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window === 'undefined') return
+                      const host = window.location.origin.replace(/^https?:\/\//, '')
+                      window.open(
+                        `https://calendar.google.com/calendar/r?cid=webcal://${host}/api/ical/${householdId}`,
+                        '_blank'
+                      )
+                    }}
+                    className="btn-ghost flex items-center gap-2 text-sm"
+                  >
+                    <span>🗓️</span> Open in Google Calendar
+                  </button>
+                  <a
+                    href={typeof window !== 'undefined'
+                      ? `webcal://${window.location.origin.replace(/^https?:\/\//, '')}/api/ical/${householdId}`
+                      : '#'}
+                    className="btn-ghost flex items-center gap-2 text-sm"
+                    aria-label="Add to Apple Calendar"
+                  >
+                    <span>🍎</span> Add to Apple Calendar
+                  </a>
+                </div>
+
+                <p className="text-xs" style={{ color: 'var(--cs-muted)' }}>
+                  💡 <strong>iPhone:</strong> tap "Add to Apple Calendar" to subscribe.&nbsp;
+                  <strong>Android:</strong> use "Open in Google Calendar".&nbsp;
+                  The feed updates automatically as chores change.
+                </p>
               </div>
             </section>
 

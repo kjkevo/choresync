@@ -152,6 +152,7 @@ export default function RewardsClient({
               { href: '/social',    label: '💬'        },
               { href: '/history',   label: '📊'        },
               { href: '/rewards',   label: '🏆', active: true },
+  { href: '/supplies',  label: '🛒'      },
               { href: '/household', label: 'House'    },
               { href: '/settings',  label: '⚙️'        },
               { href: '/profile',   label: 'Profile'  },

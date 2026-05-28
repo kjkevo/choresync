@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/social',    label: '💬'      },
   { href: '/history',   label: '📊', active: true },
   { href: '/rewards',   label: '🏆'      },
+  { href: '/supplies',  label: '🛒'      },
   { href: '/household', label: 'House'   },
   { href: '/settings',  label: '⚙️'      },
   { href: '/profile',   label: 'Profile' },

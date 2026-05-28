@@ -540,6 +540,48 @@ export interface Database {
         }
         Relationships: []
       }
+      supply_items: {
+        Row: {
+          id:           string
+          household_id: string
+          name:         string
+          quantity:     string
+          unit:         string
+          category:     string
+          added_by:     string | null
+          chore_id:     string | null
+          chore_name:   string | null
+          is_checked:   boolean
+          checked_by:   string | null
+          checked_at:   string | null
+          created_at:   string
+        }
+        Insert: {
+          id?:          string
+          household_id: string
+          name:         string
+          quantity?:    string
+          unit?:        string
+          category?:    string
+          added_by?:    string | null
+          chore_id?:    string | null
+          chore_name?:  string | null
+          is_checked?:  boolean
+          checked_by?:  string | null
+          checked_at?:  string | null
+          created_at?:  string
+        }
+        Update: {
+          name?:        string
+          quantity?:    string
+          unit?:        string
+          category?:    string
+          is_checked?:  boolean
+          checked_by?:  string | null
+          checked_at?:  string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -572,6 +614,7 @@ export type UserStreakRow        = Database['public']['Tables']['user_streaks'][
 export type RewardsCatalogRow   = Database['public']['Tables']['rewards_catalog']['Row']
 export type RedemptionRow       = Database['public']['Tables']['redemptions']['Row']
 export type ChoreCompletionReactionRow = Database['public']['Tables']['chore_completion_reactions']['Row']
+export type SupplyItemRow              = Database['public']['Tables']['supply_items']['Row']
 
 // ── Enriched / joined types ────────────────────────────────────────────────────
 

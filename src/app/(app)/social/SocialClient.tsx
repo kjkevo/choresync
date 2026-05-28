@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: '/social',    label: '💬', active: true },
   { href: '/history',   label: '📊'      },
   { href: '/rewards',   label: '🏆'      },
+  { href: '/supplies',  label: '🛒'      },
   { href: '/household', label: 'House'   },
   { href: '/settings',  label: '⚙️'      },
   { href: '/profile',   label: 'Profile' },

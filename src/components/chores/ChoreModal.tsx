@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useTransition, useEffect } from 'react'
+import { useRef, useState, useTransition, useEffect, useCallback } from 'react'
 import { createChore, updateChore } from '@/lib/actions/chores'
+import { getSchedulingSuggestions, type SchedulingSuggestion } from '@/lib/actions/scheduling'
 import type {
   ChoreRow,
   ChoreCategory,
@@ -77,6 +78,23 @@ export default function ChoreModal({
   useEffect(() => {
     if (!pointsEdited) setPoints(PRIORITY_POINTS[priority])
   }, [priority]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Assignee + due date — controlled for scheduling suggestions
+  const [assignedTo, setAssignedTo] = useState<string>(chore?.assigned_to ?? '')
+  const [dueDate,    setDueDate]    = useState<string>(chore?.due_date ?? '')
+  const [suggestion, setSuggestion] = useState<SchedulingSuggestion | null>(null)
+
+  // Fetch smart scheduling suggestion when assignee + category are set (create mode only)
+  const fetchSuggestion = useCallback(async (aid: string, cat: ChoreCategory) => {
+    if (!aid || isEdit) { setSuggestion(null); return }
+    const results = await getSchedulingSuggestions(householdId, cat, aid)
+    setSuggestion(results[0] ?? null)
+  }, [householdId, isEdit])
+
+  useEffect(() => {
+    const timer = setTimeout(() => fetchSuggestion(assignedTo, category), 300)
+    return () => clearTimeout(timer)
+  }, [assignedTo, category, fetchSuggestion])
 
   // Require photo
   const [requirePhoto, setRequirePhoto] = useState<boolean>(chore?.require_photo ?? false)
@@ -382,7 +400,12 @@ export default function ChoreModal({
                 {!rotationEnabled && (
                   <div>
                     <label htmlFor="assigned_to" className="label">Assigned to</label>
-                    <select id="assigned_to" name="assigned_to" defaultValue={chore?.assigned_to ?? ''} className="input">
+                    <select
+                      id="assigned_to" name="assigned_to"
+                      value={assignedTo}
+                      onChange={e => setAssignedTo(e.target.value)}
+                      className="input"
+                    >
                       <option value="">Unassigned</option>
                       {members.map(m => (
                         <option key={m.id} value={m.id}>
@@ -396,12 +419,42 @@ export default function ChoreModal({
                   <label htmlFor="due_date" className="label">Due date</label>
                   <input
                     id="due_date" name="due_date" type="date"
-                    defaultValue={chore?.due_date ?? ''}
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
                     min={isEdit ? undefined : todayIso()}
                     className="input"
                   />
                 </div>
               </div>
+
+              {/* ── Smart scheduling suggestion ────────────────────────────── */}
+              {suggestion && !isEdit && !dueDate && (
+                <div className="flex items-start gap-3 rounded-xl px-4 py-3"
+                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <span className="text-lg leading-none mt-0.5">💡</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-blue-800">
+                      Smart suggestion
+                    </p>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      {members.find(m => m.id === suggestion.assigneeId)?.full_name ?? 'This person'} usually
+                      completes {category} chores on <strong>{suggestion.bestDayLabel}s</strong>
+                      {suggestion.onTimeRate > 0.7 ? ` with ${Math.round(suggestion.onTimeRate * 100)}% on-time rate` : ''}.
+                    </p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      Suggested due date: <strong>{new Date(suggestion.suggestedDueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDueDate(suggestion.suggestedDueDate)}
+                    className="flex-shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                    aria-label={`Use suggested due date ${suggestion.suggestedDueDate}`}
+                  >
+                    Use date
+                  </button>
+                </div>
+              )}
 
               {/* ── Rotation ─────────────────────────────────────────────────── */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50">

@@ -1,10 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useRef, useTransition } from 'react'
 import { CATEGORY_META, PRIORITY_META, FREQUENCY_OPTIONS } from './ChoreModal'
 import type { ChoreWithAssignee } from '@/lib/types/database'
 import { parseSubtasks } from '@/lib/types/database'
+import { addSupplyItem } from '@/lib/actions/supplies'
 
 // ── Color helpers ────────────────────────────────────────────────────────────
 
@@ -124,6 +125,13 @@ export default function ChoreCard({
   const showNudge  = overdue && !!onNudge && !!chore.assigned_to && chore.assigned_to !== currentUserId && !done
   const [nudging,      setNudging]      = useState(false)
   const [nudgeResult,  setNudgeResult]  = useState<'sent' | 'err' | null>(null)
+
+  // Supply popover
+  const [showSupply,    setShowSupply]    = useState(false)
+  const [supplyName,    setSupplyName]    = useState('')
+  const [supplyAdded,   setSupplyAdded]   = useState(false)
+  const [supplyPending, startSupply]     = useTransition()
+  const supplyInputRef                   = useRef<HTMLInputElement>(null)
 
   return (
     <article
@@ -319,6 +327,60 @@ export default function ChoreCard({
                 Swap →
               </button>
             )}
+
+            {/* Supply quick-add button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setShowSupply(v => !v); setSupplyAdded(false); setSupplyName(''); setTimeout(() => supplyInputRef.current?.focus(), 50) }}
+                className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-slate-100 hover:text-emerald-600 transition-colors"
+                title="Add to supply list"
+                aria-label="Add to supply list"
+              >
+                🛒
+              </button>
+              {showSupply && (
+                <div className="absolute right-0 top-8 z-20 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
+                  <p className="mb-2 text-xs font-semibold text-slate-600">Add to supply list</p>
+                  {supplyAdded ? (
+                    <p className="text-xs font-semibold text-emerald-600">Added!</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        ref={supplyInputRef}
+                        type="text"
+                        value={supplyName}
+                        onChange={e => setSupplyName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Escape') setShowSupply(false) }}
+                        placeholder="Supply name"
+                        maxLength={100}
+                        className="input flex-1 py-1.5 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={!supplyName.trim() || supplyPending}
+                        onClick={() => {
+                          if (!supplyName.trim()) return
+                          startSupply(async () => {
+                            const fd = new FormData()
+                            fd.set('householdId', chore.household_id)
+                            fd.set('name',        supplyName.trim())
+                            fd.set('choreId',     chore.id)
+                            fd.set('choreName',   chore.name)
+                            await addSupplyItem(fd)
+                            setSupplyAdded(true)
+                            setTimeout(() => setShowSupply(false), 1200)
+                          })
+                        }}
+                        className="rounded-xl bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Notes button — always visible, any member */}
             {onNotes && (
