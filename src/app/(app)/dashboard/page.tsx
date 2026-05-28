@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
 import type { ActivityEntry, HouseholdSummary } from './DashboardClient'
@@ -15,16 +16,6 @@ import type { ReactionEntry } from './DashboardClient'
 export const metadata: Metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
 
-// Shown when there is no active session (dev / unauthenticated mode)
-const MOCK_USER: UserRow = {
-  id:         'dev',
-  email:      'dev@choresync.app',
-  full_name:  'Alex Johnson',
-  avatar_url: null,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-}
-
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -35,23 +26,7 @@ export default async function DashboardPage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // No session — render an empty but fully functional dashboard shell
-  if (!user) {
-    return (
-      <DashboardClient
-        currentUser={MOCK_USER}
-        myOverdueChores={[]}
-        myTodayChores={[]}
-        householdName="My Household"
-        householdId="dev"
-        colorMap={{ dev: '#FF6B2B' }}
-        myStreak={null}
-        pinnedAnnouncements={[]}
-        recentActivity={[]}
-        allHouseholds={[]}
-      />
-    )
-  }
+  if (!user) redirect('/login')
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([

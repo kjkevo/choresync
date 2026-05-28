@@ -178,6 +178,7 @@ export default function DashboardClient({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
             <button
               type="button"
+              aria-label={allHouseholds.length > 1 ? 'Switch household' : householdName}
               onClick={() => allHouseholds.length > 1 && setSwitcherOpen(o => !o)}
               style={{
                 fontSize: 12, fontWeight: 700, color: '#6B7280',
@@ -359,6 +360,39 @@ export default function DashboardClient({
               </div>
             )}
           </section>
+
+          {/* ── Onboarding card (shown when dashboard is completely empty) ──────── */}
+          {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              borderRadius: 20, padding: '28px 24px', marginBottom: 16, color: '#fff',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
+              <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 20, margin: '0 0 8px' }}>
+                Welcome to ChoreSync!
+              </h3>
+              <p style={{ fontSize: 14, opacity: 0.9, margin: '0 0 20px', lineHeight: 1.5 }}>
+                Your household dashboard is ready. Add your first chore or invite a roommate to get started.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <a href="/chores" style={{
+                  background: '#fff', color: '#6366f1', borderRadius: 12,
+                  padding: '10px 18px', fontSize: 14, fontWeight: 700,
+                  textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}>
+                  ✅ Add first chore
+                </a>
+                <a href="/household" style={{
+                  background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 12,
+                  padding: '10px 18px', fontSize: 14, fontWeight: 700,
+                  textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}>
+                  👥 Invite roommate
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* ── Activity feed ─────────────────────────────────────────────────── */}
           <section style={{ marginBottom: 24 }}>
@@ -666,6 +700,7 @@ function ActivityRow({
               key={emoji}
               type="button"
               onClick={() => onReactionToggle(item.id, emoji, mine)}
+              aria-label={`${mine ? 'Remove' : 'Add'} ${emoji} reaction (${users.length})`}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
                 borderRadius: 99, border: 'none', cursor: 'pointer',
