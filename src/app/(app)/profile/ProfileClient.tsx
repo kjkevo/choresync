@@ -4,6 +4,7 @@ import React, { useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { signOut, updateProfile, uploadAvatar } from '@/lib/actions/auth'
+import BottomNav from '@/components/ui/BottomNav'
 import type { UserRow } from '@/lib/types/database'
 import type { User } from '@supabase/supabase-js'
 
@@ -25,6 +26,13 @@ const AVATAR_COLORS = [
   '#84cc16', '#f97316',
 ]
 
+const AVATAR_EMOJIS = [
+  '😀', '😎', '🤩', '🥳',
+  '😺', '🦊', '🐼', '🦄',
+  '🚀', '⚡', '🌊', '🔥',
+  '🎯', '💫', '🌈', '🏆',
+]
+
 export default function ProfileClient({ user, profile, membership }: ProfileClientProps) {
   const [isPending, startTransition]         = useTransition()
   const [isSigningOut, startSignOutTransition] = useTransition()
@@ -33,11 +41,18 @@ export default function ProfileClient({ user, profile, membership }: ProfileClie
   const [avatarPreview, setAvatarPreview]    = useState<string | null>(null)
   const [selectedColor, setSelectedColor]    = useState(membership?.color_theme ?? '#6366f1')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarTab, setAvatarTab]            = useState<'photo' | 'emoji'>('photo')
+  const [emojiAvatar, setEmojiAvatar]        = useState<string | null>(
+    profile?.avatar_url?.startsWith('emoji:') ? profile.avatar_url.slice(6) : null
+  )
+  const [savingEmoji, setSavingEmoji]        = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const displayName = profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? ''
-  const avatarUrl   = avatarPreview ?? profile?.avatar_url ?? null
+  const rawAvatarUrl = avatarPreview ?? profile?.avatar_url ?? null
+  const avatarUrl   = rawAvatarUrl?.startsWith('emoji:') ? null : rawAvatarUrl
+  const currentEmoji = rawAvatarUrl?.startsWith('emoji:') ? rawAvatarUrl.slice(6) : null
   const initials    = displayName
     .split(' ')
     .map((w: string) => w[0])
@@ -113,6 +128,24 @@ export default function ProfileClient({ user, profile, membership }: ProfileClie
     })
   }
 
+  // ── Emoji avatar save ──────────────────────────────────────────────────────
+  async function handleSaveEmojiAvatar() {
+    if (!emojiAvatar) return
+    setSavingEmoji(true)
+    setError(null)
+    setSuccessMsg(null)
+    const pfd = new FormData()
+    pfd.append('fullName', displayName)
+    pfd.append('avatarUrl', `emoji:${emojiAvatar}`)
+    const result = await updateProfile(pfd)
+    setSavingEmoji(false)
+    if (result?.error) {
+      setError(result.error)
+    } else {
+      setSuccessMsg('Emoji avatar saved!')
+    }
+  }
+
   // ── Sign out ───────────────────────────────────────────────────────────────
   function handleSignOut() {
     startSignOutTransition(() => signOut())
@@ -142,7 +175,14 @@ export default function ProfileClient({ user, profile, membership }: ProfileClie
                 className="group relative block h-20 w-20 overflow-hidden rounded-full ring-4 ring-white shadow-md focus-visible:ring-indigo-500"
                 aria-label="Change profile photo"
               >
-                {avatarUrl ? (
+                {currentEmoji ? (
+                  <div
+                    className="flex h-full w-full items-center justify-center text-4xl"
+                    style={{ background: selectedColor }}
+                  >
+                    {currentEmoji}
+                  </div>
+                ) : avatarUrl ? (
                   <Image
                     src={avatarUrl}
                     alt={displayName}
@@ -201,6 +241,98 @@ export default function ProfileClient({ user, profile, membership }: ProfileClie
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Avatar Style picker */}
+        <div className="card">
+          <h2 className="mb-3 font-semibold text-slate-900">Avatar Style</h2>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderRadius: 10, background: '#F3F4F6', padding: 3 }}>
+            {(['photo', 'emoji'] as const).map(tab => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setAvatarTab(tab)}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: 8,
+                  fontFamily: '"Nunito", sans-serif', fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                  background: avatarTab === tab ? '#fff' : 'transparent',
+                  color: avatarTab === tab ? '#111827' : '#9CA3AF',
+                  boxShadow: avatarTab === tab ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {tab === 'photo' ? '📷 Photo' : '😀 Emoji'}
+              </button>
+            ))}
+          </div>
+
+          {avatarTab === 'photo' ? (
+            <p className="text-sm text-slate-500">
+              Click your avatar above to upload a photo.
+            </p>
+          ) : (
+            <div>
+              <p className="mb-3 text-sm text-slate-500">Pick an emoji as your avatar.</p>
+
+              {/* 4×4 Emoji grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+                {AVATAR_EMOJIS.map(emoji => {
+                  const sel = emojiAvatar === emoji
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setEmojiAvatar(emoji)}
+                      style={{
+                        padding: '12px 0', fontSize: 28, borderRadius: 12,
+                        border: `2px solid ${sel ? '#FF6B2B' : '#E5E7EB'}`,
+                        background: sel ? '#FFF3EE' : '#fff',
+                        cursor: 'pointer', lineHeight: 1,
+                        boxShadow: sel ? '0 0 0 3px rgba(255,107,43,0.15)' : 'none',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {emojiAvatar && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: '50%',
+                    background: selectedColor, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 28,
+                  }}>
+                    {emojiAvatar}
+                  </div>
+                  <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
+                    Preview on your color background
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSaveEmojiAvatar}
+                disabled={!emojiAvatar || savingEmoji}
+                style={{
+                  width: '100%', padding: '11px 0',
+                  background: emojiAvatar && !savingEmoji ? '#FF6B2B' : '#E5E7EB',
+                  color: emojiAvatar && !savingEmoji ? '#fff' : '#9CA3AF',
+                  border: 'none', borderRadius: 12, cursor: emojiAvatar && !savingEmoji ? 'pointer' : 'default',
+                  fontFamily: '"Nunito", sans-serif', fontWeight: 700, fontSize: 14,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {savingEmoji ? 'Saving…' : 'Save emoji avatar'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Feedback */}
@@ -349,6 +481,8 @@ export default function ProfileClient({ user, profile, membership }: ProfileClie
           </a>
         </div>
       </div>
+
+      <BottomNav />
     </div>
   )
 }

@@ -19,16 +19,11 @@ import type {
 const EMOJIS: MessageEmoji[] = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home'    },
-  { href: '/chores',    label: 'Chores'  },
-  { href: '/calendar',  label: '📅'      },
-  { href: '/social',    label: '💬', active: true },
-  { href: '/history',   label: '📊'      },
-  { href: '/rewards',   label: '🏆'      },
-  { href: '/supplies',  label: '🛒'      },
-  { href: '/household', label: 'House'   },
-  { href: '/settings',  label: '⚙️'      },
-  { href: '/profile',   label: 'Profile' },
+  { href: '/dashboard',   label: 'Dashboard' },
+  { href: '/leaderboard', label: 'Rankings'  },
+  { href: '/custom',      label: 'Custom'    },
+  { href: '/social',      label: '💬', active: true },
+  { href: '/profile',     label: 'Profile'   },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

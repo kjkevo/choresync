@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
-import type { ActivityEntry, HouseholdSummary } from './DashboardClient'
+import type { ActivityEntry, HouseholdSummary, HouseholdChoreRow } from './DashboardClient'
 import type {
   ChoreRow,
   ChoreWithAssignee,
@@ -43,6 +43,7 @@ export default async function DashboardPage({
         pinnedAnnouncements={[]}
         recentActivity={[]}
         allHouseholds={[]}
+        householdAllChores={[]}
       />
     )
   }
@@ -70,6 +71,7 @@ export default async function DashboardPage({
         pinnedAnnouncements={[]}
         recentActivity={[]}
         allHouseholds={[]}
+        householdAllChores={[]}
       />
     )
   }
@@ -134,6 +136,26 @@ export default async function DashboardPage({
 
   const myOverdue = myChores.filter(c => c.due_date! < today)
   const myToday   = myChores.filter(c => c.due_date === today)
+
+  // ── 4b. All household chores for the overview section ────────────────────
+  const { data: allChoreRowsRaw } = await supabase
+    .from('chores')
+    .select('id, name, status, assigned_to, points, category')
+    .eq('household_id', householdId)
+    .order('due_date', { ascending: true })
+    .limit(30)
+
+  const householdAllChores: HouseholdChoreRow[] = ((allChoreRowsRaw ?? []) as {
+    id: string; name: string; status: string; assigned_to: string | null; points: number; category: string
+  }[]).map(c => ({
+    id:           c.id,
+    name:         c.name,
+    status:       (c.status === 'completed' ? 'complete' : 'incomplete') as 'incomplete' | 'complete',
+    assigned_to:  c.assigned_to,
+    assigneeName: c.assigned_to ? (profileMap[c.assigned_to]?.full_name ?? 'Unknown') : null,
+    points:       c.points ?? 0,
+    category:     c.category ?? 'general',
+  }))
 
   // ── 5. Household name + my streak + pinned announcements ─────────────────
   const activeHousehold = allHouseholds.find(h => h.id === householdId)
@@ -219,6 +241,7 @@ export default async function DashboardPage({
       pinnedAnnouncements={pinnedAnnouncements}
       recentActivity={recentActivity}
       allHouseholds={allHouseholds}
+      householdAllChores={householdAllChores}
     />
   )
 }

@@ -8,9 +8,20 @@ import { addCompletionReaction, removeCompletionReaction } from '@/lib/actions/r
 import CompleteChoreSheet from '@/components/chores/CompleteChoreSheet'
 import { CATEGORY_META } from '@/components/chores/ChoreModal'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import BottomNav from '@/components/ui/BottomNav'
 import type { ChoreWithAssignee, UserRow } from '@/lib/types/database'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface HouseholdChoreRow {
+  id:           string
+  name:         string
+  status:       'incomplete' | 'complete'
+  assigned_to:  string | null
+  assigneeName: string | null
+  points:       number
+  category:     string
+}
 
 export interface ReactionEntry {
   emoji:  string
@@ -84,6 +95,7 @@ interface DashboardClientProps {
   pinnedAnnouncements: { id: string; content: string; author: UserRow | null }[]
   recentActivity:      ActivityEntry[]
   allHouseholds?:      HouseholdSummary[]
+  householdAllChores?: HouseholdChoreRow[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -99,6 +111,7 @@ export default function DashboardClient({
   pinnedAnnouncements,
   recentActivity:     initialActivity,
   allHouseholds = [],
+  householdAllChores = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const { t } = useLanguage()
@@ -340,7 +353,7 @@ export default function DashboardClient({
                 </p>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: '6px 0 0' }}>
                   Check the{' '}
-                  <a href="/chores" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Chores tab</a>
+                  <a href="/custom" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom tab</a>
                   {' '}for upcoming tasks
                 </p>
               </div>
@@ -357,6 +370,72 @@ export default function DashboardClient({
                     markDoneLabel={t('markDone')}
                   />
                 ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── Household Chores ──────────────────────────────────────────────── */}
+          <section style={{ marginBottom: 20 }}>
+            <SectionTitle icon="🏠" label="Household" color="#374151" />
+            {householdAllChores.length === 0 ? (
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
+                padding: '24px 20px', textAlign: 'center',
+              }}>
+                <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+                  No chores yet — create some in{' '}
+                  <a href="/custom" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom ✨</a>
+                </p>
+              </div>
+            ) : (
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                {householdAllChores.map((chore, i) => {
+                  const catMeta = (CATEGORY_META as Record<string, { emoji: string }>)[chore.category] ?? { emoji: '🏠' }
+                  const isDone  = chore.status === 'complete'
+                  return (
+                    <div
+                      key={chore.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 16px',
+                        borderBottom: i < householdAllChores.length - 1 ? '1px solid #F7F8FA' : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{catMeta.emoji}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          fontFamily: '"Poppins", sans-serif', fontWeight: 600, fontSize: 13,
+                          color: isDone ? '#9CA3AF' : '#111827', margin: 0,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          textDecoration: isDone ? 'line-through' : 'none',
+                        }}>
+                          {chore.name}
+                        </p>
+                        {chore.assigneeName && (
+                          <p style={{ fontSize: 11, color: '#9CA3AF', margin: '2px 0 0' }}>
+                            {chore.assigneeName}
+                          </p>
+                        )}
+                      </div>
+                      {chore.points > 0 && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color: '#B45309',
+                          background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0,
+                        }}>
+                          {chore.points} pts
+                        </span>
+                      )}
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, flexShrink: 0,
+                        borderRadius: 99, padding: '3px 9px',
+                        background: isDone ? '#D1FAE5' : '#F3F4F6',
+                        color: isDone ? '#059669' : '#6B7280',
+                      }}>
+                        {isDone ? '✓ Done' : 'Pending'}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </section>
@@ -425,19 +504,7 @@ export default function DashboardClient({
         </main>
 
         {/* ── Bottom nav ────────────────────────────────────────────────────── */}
-        <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-          background: '#fff', borderTop: '1px solid #F0F0F0',
-          display: 'flex', alignItems: 'center',
-          height: 68, padding: '0 8px 6px',
-          boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
-        }}>
-          <BottomNavItem href="/dashboard" label="Home"     icon={<HomeIcon />}     active />
-          <BottomNavItem href="/chores"    label="Chores"   icon={<ChoresIcon />}         />
-          <BottomNavItem href="/calendar"  label="Calendar" icon={<CalendarIcon />}       />
-          <BottomNavItem href="/social"    label="Chat"     icon={<ChatIcon />}           />
-          <BottomNavItem href="/profile"   label="Profile"  icon={<ProfileIcon />}        />
-        </nav>
+        <BottomNav />
       </div>
 
       {completeSheet && (
@@ -771,15 +838,19 @@ function ActivityRow({
 }
 
 function AvatarCircle({ user, color, size }: { user: UserRow; color?: string; size: number }) {
+  const isEmoji = user.avatar_url?.startsWith('emoji:')
+  const emoji   = isEmoji ? user.avatar_url!.slice(6) : null
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
       background: color ?? '#6366F1', flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.35, fontWeight: 700, color: '#fff',
+      fontSize: isEmoji ? size * 0.55 : size * 0.35, fontWeight: 700, color: '#fff',
       overflow: 'hidden',
     }}>
-      {user.avatar_url ? (
+      {emoji ? (
+        emoji
+      ) : user.avatar_url ? (
         <Image
           src={user.avatar_url} alt={user.full_name ?? ''}
           width={size} height={size}
@@ -805,78 +876,9 @@ function Chip({ children, bg, color }: { children: React.ReactNode; bg: string; 
   )
 }
 
-function BottomNavItem({ href, label, icon, active }: {
-  href:   string
-  label:  string
-  icon:   React.ReactNode
-  active?: boolean
-}) {
-  return (
-    <a href={href} style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', gap: 3, textDecoration: 'none',
-      color: active ? '#FF6B2B' : '#9CA3AF',
-      padding: '4px 0',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {icon}
-      </div>
-      <span style={{
-        fontSize: 10, fontFamily: '"Nunito", sans-serif',
-        fontWeight: active ? 800 : 600,
-        letterSpacing: '0.01em',
-      }}>
-        {label}
-      </span>
-    </a>
-  )
-}
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 
-const IC = { width: 22, height: 22, fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-
-function HomeIcon() {
-  return (
-    <svg {...IC} viewBox="0 0 24 24">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  )
-}
-function ChoresIcon() {
-  return (
-    <svg {...IC} viewBox="0 0 24 24">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-    </svg>
-  )
-}
-function CalendarIcon() {
-  return (
-    <svg {...IC} viewBox="0 0 24 24">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8"  y1="2" x2="8"  y2="6" />
-      <line x1="3"  y1="10" x2="21" y2="10" />
-    </svg>
-  )
-}
-function ChatIcon() {
-  return (
-    <svg {...IC} viewBox="0 0 24 24">
-      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-    </svg>
-  )
-}
-function ProfileIcon() {
-  return (
-    <svg {...IC} viewBox="0 0 24 24">
-      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  )
-}
 function XIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
