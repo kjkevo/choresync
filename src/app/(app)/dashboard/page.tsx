@@ -57,23 +57,9 @@ export default async function DashboardPage({
   ])
   const profile = profileRaw as UserRow | null
 
-  // No household yet — render empty dashboard rather than redirecting to onboarding
+  // No household → send to onboarding
   if (!allMemberships || allMemberships.length === 0) {
-    return (
-      <DashboardClient
-        currentUser={profile as UserRow}
-        myOverdueChores={[]}
-        myTodayChores={[]}
-        householdName="My Household"
-        householdId=""
-        colorMap={{ [user.id]: '#FF6B2B' }}
-        myStreak={null}
-        pinnedAnnouncements={[]}
-        recentActivity={[]}
-        allHouseholds={[]}
-        householdAllChores={[]}
-      />
-    )
+    redirect('/onboarding')
   }
 
   // Pick active household: prefer ?h= param, else first membership
