@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { logIn, signUp } from '@/lib/actions/auth'
 import { createClient } from '@/lib/supabase/client'
@@ -34,6 +34,11 @@ export default function AuthScreen({
   redirectTo: string
 }) {
   const [tab, setTab] = useState<Tab>(initialTab)
+
+  // Fix #9 — update browser tab title when user toggles between sign in / sign up
+  useEffect(() => {
+    document.title = tab === 'login' ? 'Sign In | ChoreSync' : 'Sign Up | ChoreSync'
+  }, [tab])
 
   return (
     <>
@@ -127,13 +132,13 @@ export default function AuthScreen({
               </p>
             </div>
 
-            {/* Feature list */}
+            {/* Feature list — only features that actually ship */}
             <ul style={{ listStyle: 'none', padding: 0, margin: '24px 0 0 0' }}>
               {[
-                'Smart chore rotation & assignment',
-                'Points, streaks & badge rewards',
-                'Photo proof of completion',
-                'Real-time household chat',
+                'Smart scheduling based on your habits',
+                'Google & Apple Calendar sync',
+                'Offline mode — works without internet',
+                'Shared household supply list',
               ].map((text) => (
                 <li key={text} style={{
                   display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
@@ -264,6 +269,7 @@ function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError]            = useState<string | null>(null)
   const [showPw, setShowPw]          = useState(false)
+  const [rememberMe, setRememberMe]  = useState(true)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -306,6 +312,26 @@ function LoginForm({ redirectTo }: { redirectTo: string }) {
             onToggle={() => setShowPw(v => !v)}
           />
         </Field>
+
+        {/* Remember Me */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          cursor: 'pointer', userSelect: 'none',
+        }}>
+          <input
+            type="checkbox"
+            name="rememberMe"
+            checked={rememberMe}
+            onChange={e => setRememberMe(e.target.checked)}
+            style={{
+              width: 16, height: 16, accentColor: '#FF6B2B', cursor: 'pointer',
+              borderRadius: 4, flexShrink: 0,
+            }}
+          />
+          <span style={{ fontSize: 14, color: '#475569', fontWeight: 500 }}>
+            Remember me on this device
+          </span>
+        </label>
 
         <SubmitButton loading={isPending} label="Sign In" loadingLabel="Signing in…" />
       </form>
@@ -393,8 +419,13 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
           <Field label="First name">
             <StyledInput name="firstName" type="text" autoComplete="given-name" placeholder="Alex" />
           </Field>
-          <Field label="Last name">
-            <StyledInput name="lastName" type="text" autoComplete="family-name" placeholder="Johnson" />
+          <Field
+            label="Last name"
+            action={
+              <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>optional</span>
+            }
+          >
+            <StyledInput name="lastName" type="text" autoComplete="family-name" placeholder="Johnson" required={false} />
           </Field>
         </div>
 
@@ -410,8 +441,14 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
             onToggle={() => setShowPw(v => !v)}
             value={password}
             onChange={setPassword}
-            placeholder="Min. 8 characters"
+            placeholder="••••••••"
           />
+          {/* Always-visible requirements */}
+          {password.length === 0 && (
+            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
+              At least 8 characters · mix of letters &amp; numbers recommended
+            </p>
+          )}
           {password.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -478,25 +515,14 @@ function SocialButtons({ redirectTo = '/dashboard' }: { redirectTo?: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {error && <ErrorBanner message={error} />}
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        {/* Google */}
-        <SocialButton
-          label="Google"
-          disabled={loading !== null}
-          loading={loading === 'google'}
-          onClick={() => signInWith('google')}
-          icon={<GoogleIcon />}
-        />
-
-        {/* Apple */}
-        <SocialButton
-          label="Apple"
-          disabled={loading !== null}
-          loading={loading === 'apple'}
-          onClick={() => signInWith('apple')}
-          icon={<AppleIcon />}
-        />
-      </div>
+      {/* Google — full width; Apple requires native iOS config, so omitted on web */}
+      <SocialButton
+        label="Continue with Google"
+        disabled={loading !== null}
+        loading={loading === 'google'}
+        onClick={() => signInWith('google')}
+        icon={<GoogleIcon />}
+      />
     </div>
   )
 }
@@ -552,9 +578,9 @@ function Field({
 }
 
 function StyledInput({
-  name, type, autoComplete, placeholder,
+  name, type, autoComplete, placeholder, required = true,
 }: {
-  name: string; type: string; autoComplete?: string; placeholder?: string
+  name: string; type: string; autoComplete?: string; placeholder?: string; required?: boolean
 }) {
   const [focused, setFocused] = useState(false)
   return (
@@ -563,7 +589,7 @@ function StyledInput({
       type={type}
       autoComplete={autoComplete}
       placeholder={placeholder}
-      required
+      required={required}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
@@ -719,10 +745,3 @@ function GoogleIcon() {
   )
 }
 
-function AppleIcon() {
-  return (
-    <svg style={{ width: 16, height: 16, flexShrink: 0 }} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
-    </svg>
-  )
-}

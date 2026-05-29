@@ -1,7 +1,18 @@
 import type { Metadata } from 'next'
 import AuthScreen from './AuthScreen'
 
-export const metadata: Metadata = { title: 'Sign In' }
+// Dynamic title so the browser tab reflects which form is active on first load
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const isSignup = params.tab === 'signup'
+  return {
+    title: isSignup ? 'Sign Up | ChoreSync' : 'Sign In | ChoreSync',
+  }
+}
 
 export default async function LoginPage({
   searchParams,

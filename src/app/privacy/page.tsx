@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import BackLink from '@/app/_components/BackLink'
 
 export const metadata: Metadata = { title: 'Privacy Policy' }
 
@@ -13,14 +14,8 @@ export default function PrivacyPage() {
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
 
-        {/* Back link */}
-        <Link href="/dashboard" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 14, fontWeight: 600, color: '#FF6B2B',
-          textDecoration: 'none', marginBottom: 32,
-        }}>
-          ← Back to app
-        </Link>
+        {/* Back link — returns to wherever the user came from */}
+        <BackLink fallback="/login" />
 
         {/* Header */}
         <div style={{
