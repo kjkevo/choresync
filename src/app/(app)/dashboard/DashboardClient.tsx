@@ -759,7 +759,7 @@ function ActivityRow({
       </div>
 
       {/* Reaction bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, marginLeft: 50, position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 9, marginLeft: 50, flexWrap: 'wrap', position: 'relative' }}>
         {Object.entries(grouped).map(([emoji, users]) => {
           const mine = users.includes(currentUserId)
           return (
@@ -769,42 +769,60 @@ function ActivityRow({
               onClick={() => onReactionToggle(item.id, emoji, mine)}
               aria-label={`${mine ? 'Remove' : 'Add'} ${emoji} reaction (${users.length})`}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                borderRadius: 99, border: 'none', cursor: 'pointer',
-                padding: '2px 7px', fontSize: 12, fontWeight: 700,
-                background: mine ? '#EEF2FF' : '#F3F4F6',
-                color: mine ? '#4338CA' : '#6B7280',
-                transition: 'background 0.15s',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                borderRadius: 99,
+                border: mine ? '1.5px solid #818CF8' : '1.5px solid #E5E7EB',
+                cursor: 'pointer',
+                padding: '3px 9px', fontSize: 13, fontWeight: 700,
+                background: mine ? '#EEF2FF' : '#fff',
+                color: mine ? '#4338CA' : '#374151',
+                transition: 'all 0.15s',
+                boxShadow: mine ? '0 0 0 2px rgba(99,102,241,0.1)' : 'none',
               }}
             >
-              {emoji} {users.length}
+              {emoji} <span style={{ fontSize: 12 }}>{users.length}</span>
             </button>
           )
         })}
 
-        {/* Add reaction "+" button */}
+        {/* Add reaction button — always visible so users know they can react */}
         <div ref={pickerRef} style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => setPickerOpen(v => !v)}
-            style={{
-              width: 26, height: 26, borderRadius: '50%', border: 'none',
-              background: 'none', cursor: 'pointer', fontSize: 14, color: '#9CA3AF',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#F3F4F6' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
             aria-label="Add reaction"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              borderRadius: 99,
+              border: '1.5px dashed #D1D5DB',
+              background: pickerOpen ? '#F9FAFB' : '#fff',
+              cursor: 'pointer',
+              padding: '3px 9px', fontSize: 13, color: '#6B7280',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              const b = e.currentTarget as HTMLButtonElement
+              b.style.borderColor = '#FF6B2B'
+              b.style.color = '#FF6B2B'
+            }}
+            onMouseLeave={e => {
+              const b = e.currentTarget as HTMLButtonElement
+              if (!pickerOpen) {
+                b.style.borderColor = '#D1D5DB'
+                b.style.color = '#6B7280'
+              }
+            }}
           >
-            +
+            <span style={{ fontSize: 14 }}>😊</span>
+            <span style={{ fontSize: 11, fontWeight: 600 }}>React</span>
           </button>
 
           {pickerOpen && (
             <div style={{
-              position: 'absolute', bottom: 30, left: 0, zIndex: 60,
-              background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-              border: '1px solid #F0F0F0', padding: '6px 8px',
+              position: 'absolute', bottom: 36, left: 0, zIndex: 60,
+              background: '#fff', borderRadius: 14,
+              boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
+              border: '1px solid #F0F0F0', padding: '8px 10px',
               display: 'flex', gap: 4,
             }}>
               {REACTION_EMOJIS.map(emoji => {
@@ -814,15 +832,26 @@ function ActivityRow({
                     key={emoji}
                     type="button"
                     onClick={() => { setPickerOpen(false); onReactionToggle(item.id, emoji, mine) }}
+                    title={mine ? `Remove ${emoji}` : `React with ${emoji}`}
                     style={{
-                      width: 32, height: 32, borderRadius: 8, border: 'none',
+                      width: 38, height: 38, borderRadius: 10,
+                      border: mine ? '2px solid #818CF8' : '2px solid transparent',
                       background: mine ? '#EEF2FF' : 'none',
-                      cursor: 'pointer', fontSize: 18,
+                      cursor: 'pointer', fontSize: 20,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'background 0.1s',
+                      transition: 'all 0.12s',
+                      transform: 'scale(1)',
                     }}
-                    onMouseEnter={e => { if (!mine) (e.currentTarget as HTMLButtonElement).style.background = '#F9FAFB' }}
-                    onMouseLeave={e => { if (!mine) (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                    onMouseEnter={e => {
+                      const b = e.currentTarget as HTMLButtonElement
+                      b.style.background = mine ? '#E0E7FF' : '#F3F4F6'
+                      b.style.transform = 'scale(1.2)'
+                    }}
+                    onMouseLeave={e => {
+                      const b = e.currentTarget as HTMLButtonElement
+                      b.style.background = mine ? '#EEF2FF' : 'none'
+                      b.style.transform = 'scale(1)'
+                    }}
                     aria-label={`React with ${emoji}`}
                   >
                     {emoji}
