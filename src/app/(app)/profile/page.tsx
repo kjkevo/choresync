@@ -1,16 +1,70 @@
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import ProfileClient from './ProfileClient'
+import BottomNav from '@/components/ui/BottomNav'
 import type { UserRow } from '@/lib/types/database'
 
 export const metadata: Metadata = { title: 'Profile' }
+
+// ── Guest screen (not signed in) ──────────────────────────────────────────────
+function ProfileGuestScreen() {
+  return (
+    <>
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
+        padding: '0 24px 88px',
+        textAlign: 'center',
+      }}>
+        {/* Avatar placeholder */}
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: '#E5E7EB', marginBottom: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 36,
+        }}>
+          👤
+        </div>
+        <h1 style={{
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 22, color: '#111827', margin: '0 0 10px',
+        }}>
+          Your Profile
+        </h1>
+        <p style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.6, margin: '0 0 32px', maxWidth: 300 }}>
+          Sign in to view your stats, badges, household, and account settings.
+        </p>
+        <a href="/login" style={{
+          display: 'inline-block',
+          background: '#FF6B2B', color: '#fff',
+          borderRadius: 14, padding: '14px 36px',
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 15, textDecoration: 'none',
+          boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+        }}>
+          Sign in
+        </a>
+        <a href="/login?tab=signup" style={{
+          display: 'inline-block', marginTop: 14,
+          color: '#FF6B2B', fontWeight: 700, fontSize: 14,
+          textDecoration: 'none', fontFamily: '"Nunito", sans-serif',
+        }}>
+          Create account →
+        </a>
+      </div>
+      <BottomNav />
+    </>
+  )
+}
 
 export default async function ProfilePage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/dashboard')
+
+  // Not signed in — show profile page with sign-in prompt (no redirect)
+  if (!user) return <ProfileGuestScreen />
 
   // ── 1. Profile ────────────────────────────────────────────────────────────
   const { data: profile } = await supabase

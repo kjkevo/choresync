@@ -1,7 +1,7 @@
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import SocialClient from './SocialClient'
+import BottomNav from '@/components/ui/BottomNav'
 import type {
   UserRow,
   MessageRow,
@@ -14,11 +14,87 @@ import type {
 export const metadata: Metadata = { title: 'Chat & Announcements' }
 export const dynamic = 'force-dynamic'
 
+// ── Guest screen (not signed in) ──────────────────────────────────────────────
+function ChatGuestScreen() {
+  return (
+    <>
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
+        padding: '0 24px 88px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>💬</div>
+        <h1 style={{
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 22, color: '#111827', margin: '0 0 10px',
+        }}>
+          Household Chat
+        </h1>
+        <p style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.6, margin: '0 0 32px', maxWidth: 300 }}>
+          Sign in to message your household members in real time.
+        </p>
+        <a href="/login" style={{
+          display: 'inline-block',
+          background: '#FF6B2B', color: '#fff',
+          borderRadius: 14, padding: '14px 36px',
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 15, textDecoration: 'none',
+          boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+        }}>
+          Sign in
+        </a>
+      </div>
+      <BottomNav />
+    </>
+  )
+}
+
+// ── No household screen ───────────────────────────────────────────────────────
+function NoHouseholdScreen() {
+  return (
+    <>
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
+        padding: '0 24px 88px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🏠</div>
+        <h1 style={{
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 22, color: '#111827', margin: '0 0 10px',
+        }}>
+          Join a Household
+        </h1>
+        <p style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.6, margin: '0 0 32px', maxWidth: 300 }}>
+          You need to be part of a household to use chat. Create or join one to get started.
+        </p>
+        <a href="/onboarding" style={{
+          display: 'inline-block',
+          background: '#FF6B2B', color: '#fff',
+          borderRadius: 14, padding: '14px 36px',
+          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+          fontSize: 15, textDecoration: 'none',
+          boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+        }}>
+          Set up household
+        </a>
+      </div>
+      <BottomNav />
+    </>
+  )
+}
+
 export default async function SocialPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/dashboard')
+
+  // Not signed in — show chat page with sign-in prompt (no redirect)
+  if (!user) return <ChatGuestScreen />
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([
@@ -29,7 +105,9 @@ export default async function SocialPage() {
   ])
   const profile = profileRaw as UserRow | null
 
-  if (!membership) redirect('/onboarding')
+  // Signed in but no household yet — show join prompt (no redirect)
+  if (!membership) return <NoHouseholdScreen />
+
   const { household_id: householdId, role } = membership
   const isAdmin = role === 'admin'
 
