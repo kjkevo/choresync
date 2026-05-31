@@ -4,221 +4,276 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createHousehold, joinHousehold } from '@/lib/actions/household'
 import { createChore } from '@/lib/actions/chores'
+import { updateProfile } from '@/lib/actions/auth'
 
 // ─── Fonts ────────────────────────────────────────────────────────────────────
 
-const FONTS = `
-  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito:wght@400;500;600;700&display=swap');
-`
+const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito:wght@400;500;600;700;800&display=swap');`
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TEMPLATES = [
-  { name: 'Sweep floors',     emoji: '🧹', category: 'general',   defaultPoints: 10 },
-  { name: 'Wash dishes',      emoji: '🍽️', category: 'kitchen',   defaultPoints: 8  },
-  { name: 'Do laundry',       emoji: '🧺', category: 'laundry',   defaultPoints: 12 },
-  { name: 'Clean bathroom',   emoji: '🚽', category: 'general',   defaultPoints: 15 },
-  { name: 'Take out trash',   emoji: '🗑️', category: 'general',   defaultPoints: 6  },
-  { name: 'Vacuum',           emoji: '🌀', category: 'general',   defaultPoints: 10 },
-  { name: 'Mop floors',       emoji: '🪣', category: 'general',   defaultPoints: 12 },
-  { name: 'Clean kitchen',    emoji: '✨', category: 'kitchen',   defaultPoints: 10 },
-  { name: 'Grocery shopping', emoji: '🛒', category: 'general',   defaultPoints: 15 },
-  { name: 'Feed pets',        emoji: '🐾', category: 'general',   defaultPoints: 5  },
-  { name: 'Water plants',     emoji: '🌿', category: 'general',   defaultPoints: 5  },
-  { name: 'Make beds',        emoji: '🛏️', category: 'bedroom',   defaultPoints: 5  },
-  { name: 'Dust surfaces',    emoji: '✨', category: 'general',   defaultPoints: 8  },
-  { name: 'Clean fridge',     emoji: '🧊', category: 'kitchen',   defaultPoints: 10 },
+const CHORE_TEMPLATES = [
+  { name: 'Wash dishes',      emoji: '🍽️', points: 8,  freq: 'daily'   },
+  { name: 'Sweep floors',     emoji: '🧹', points: 10, freq: 'weekly'  },
+  { name: 'Do laundry',       emoji: '🧺', points: 12, freq: 'weekly'  },
+  { name: 'Clean bathroom',   emoji: '🚽', points: 15, freq: 'weekly'  },
+  { name: 'Take out trash',   emoji: '🗑️', points: 6,  freq: 'weekly'  },
+  { name: 'Vacuum',           emoji: '🌀', points: 10, freq: 'weekly'  },
+  { name: 'Mop floors',       emoji: '🪣', points: 12, freq: 'weekly'  },
+  { name: 'Clean kitchen',    emoji: '✨', points: 10, freq: 'weekly'  },
+  { name: 'Grocery shopping', emoji: '🛒', points: 15, freq: 'weekly'  },
+  { name: 'Feed pets',        emoji: '🐾', points: 5,  freq: 'daily'   },
+  { name: 'Water plants',     emoji: '🌿', points: 5,  freq: 'weekly'  },
+  { name: 'Make beds',        emoji: '🛏️', points: 5,  freq: 'daily'   },
+  { name: 'Clean fridge',     emoji: '🧊', points: 10, freq: 'monthly' },
+  { name: 'Dust surfaces',    emoji: '✨', points: 8,  freq: 'weekly'  },
 ] as const
 
-type TemplateItem = {
-  name: string
-  emoji: string
-  category: string
-  defaultPoints: number
-}
-
-const FREQUENCIES = ['one-time', 'daily', 'weekly', 'monthly'] as const
-type Frequency = typeof FREQUENCIES[number]
-
-const JUDGMENT_OPTIONS = [
-  {
-    id:       'self' as const,
-    icon:     '✅',
-    title:    'Just a checkmark',
-    desc:     'Member marks it done themselves. Simple and trusted.',
-    disabled: false,
-  },
-  {
-    id:       'vote' as const,
-    icon:     '👥',
-    title:    'Group vote',
-    desc:     'Household members vote to approve completion.',
-    disabled: false,
-  },
-  {
-    id:       'ai' as const,
-    icon:     '🤖',
-    title:    'AI review',
-    desc:     'Upload a photo and AI decides if the chore is done well.',
-    disabled: true,
-  },
+const MEMBER_COLORS = [
+  '#FF6B2B','#6366F1','#10B981','#8B5CF6',
+  '#EC4899','#F59E0B','#06B6D4','#EF4444',
 ]
 
-type JudgmentType = 'self' | 'vote' | 'ai'
-
-type ChoreConfig = {
-  template: TemplateItem | null   // null = custom
-  name: string
-  points: number
-  dueDate: string
-  frequency: Frequency
-  category: string
-}
-
-// ─── Steps ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Step =
-  | 'choice'
+  | 'welcome'
   | 'join'
-  | 'create-name'
-  | 'create-template'
-  | 'create-configure'
-  | 'create-assign'
-  | 'create-judgment'
-  | 'create-success'
+  | 'admin-name'
+  | 'room-name'
+  | 'members'
+  | 'chores'
+  | 'chore-configure'
+  | 'rotation'
+  | 'success'
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface OnboardingClientProps {
-  displayName: string
+type ChoreItem = {
+  emoji:     string
+  name:      string
+  points:    number
+  freq:      string
+  assignTo:  string   // member name or 'rotate' or 'unassigned'
+  isCustom:  boolean
 }
 
-// ─── Shared style tokens ──────────────────────────────────────────────────────
+type MemberEntry = { id: string; name: string; color: string }
 
-const labelStyle: React.CSSProperties = {
-  display: 'block', marginBottom: 6,
-  fontFamily: '"Nunito", sans-serif', fontWeight: 700,
-  fontSize: 13, color: '#374151',
-}
+// ─── Step metadata ────────────────────────────────────────────────────────────
+
+const CREATE_STEPS: Step[] = ['admin-name', 'room-name', 'members', 'chores', 'chore-configure', 'rotation']
+const CREATE_LABELS = ['You', 'Room', 'People', 'Chores', 'Details', 'Rotation']
+
+// ─── Style helpers ────────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
   display: 'block', width: '100%', boxSizing: 'border-box',
   border: '2px solid #E5E7EB', borderRadius: 12,
-  padding: '11px 14px', fontSize: 14, color: '#111827',
+  padding: '12px 16px', fontSize: 15, color: '#111827',
   fontFamily: '"Nunito", sans-serif', outline: 'none',
-  background: '#fff',
+  background: '#fff', fontWeight: 600,
+  transition: 'border-color 0.15s',
 }
 
-const CREATE_STEPS: Step[] = [
-  'create-name',
-  'create-template',
-  'create-configure',
-  'create-assign',
-  'create-judgment',
-]
+const labelStyle: React.CSSProperties = {
+  display: 'block', marginBottom: 7,
+  fontFamily: '"Nunito", sans-serif', fontWeight: 800,
+  fontSize: 13, color: '#374151',
+}
 
-const CREATE_STEP_LABELS = ['Name', 'Templates', 'Configure', 'Assign', 'Judgment']
+function primaryBtn(disabled: boolean): React.CSSProperties {
+  return {
+    display: 'block', width: '100%', padding: '14px',
+    borderRadius: 14, border: 'none',
+    background: disabled ? '#E5E7EB' : '#FF6B2B',
+    color: disabled ? '#9CA3AF' : '#fff',
+    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15,
+    cursor: disabled ? 'default' : 'pointer',
+    boxShadow: disabled ? 'none' : '0 4px 14px rgba(255,107,43,0.3)',
+    transition: 'all 0.15s',
+  }
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function OnboardingClient({ displayName }: OnboardingClientProps) {
+export default function OnboardingClient({ displayName }: { displayName: string }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [step, setStep]              = useState<Step>('choice')
-  const [error, setError]            = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('welcome')
+  const [error, setError] = useState<string | null>(null)
 
-  // Household created
+  // Admin info
+  const [adminName, setAdminName] = useState(displayName === 'there' ? '' : displayName)
+
+  // Household
   const [household, setHousehold] = useState<{ id: string; name: string; invite_code: string } | null>(null)
+  const [roomName, setRoomName] = useState('')
 
-  // Template selection (multi-select)
-  const [selectedTemplates, setSelectedTemplates] = useState<TemplateItem[]>([])
-  const [customSelected, setCustomSelected]       = useState(false)
+  // Members
+  const [members, setMembers] = useState<MemberEntry[]>([])
+  const [memberInput, setMemberInput] = useState('')
 
-  // Chore configs (one per selected template + one if custom)
-  const [choreConfigs, setChoreConfigs] = useState<ChoreConfig[]>([])
-  const [expandedIdx, setExpandedIdx]   = useState<number>(0)
+  // Chores
+  const [selectedTemplates, setSelectedTemplates] = useState<Set<number>>(new Set())
+  const [chores, setChores] = useState<ChoreItem[]>([])
+  const [expandedChore, setExpandedChore] = useState(0)
 
-  // Assign + judgment
-  const [assignTo, setAssignTo]   = useState<'me' | 'unassigned'>('me')
-  const [judgment, setJudgment]   = useState<JudgmentType>('self')
+  // Rotation
+  const [rotationType, setRotationType] = useState<'manual' | 'round-robin' | 'random'>('round-robin')
 
-  // Join flow
+  // Join
   const [joinCode, setJoinCode] = useState('')
 
   // Success
   const [copied, setCopied] = useState(false)
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-
   function clearError() { setError(null) }
 
-  function buildChoreConfigs(templates: TemplateItem[], withCustom: boolean): ChoreConfig[] {
-    const configs: ChoreConfig[] = templates.map(t => ({
-      template: t,
-      name: t.name,
-      points: t.defaultPoints,
-      dueDate: '',
-      frequency: 'weekly' as Frequency,
-      category: t.category,
-    }))
-    if (withCustom) {
-      configs.push({
-        template: null,
-        name: '',
-        points: 10,
-        dueDate: '',
-        frequency: 'one-time' as Frequency,
-        category: 'general',
-      })
+  // ── Step index ────────────────────────────────────────────────────────────
+  const stepIdx = CREATE_STEPS.indexOf(step)
+  const showProgress = stepIdx !== -1
+
+  // ── Member helpers ────────────────────────────────────────────────────────
+  function addMember() {
+    const name = memberInput.trim()
+    if (!name) return
+    if (members.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+      setError('That name is already added.')
+      return
     }
-    return configs
+    setMembers(prev => [...prev, {
+      id: `m-${Date.now()}`,
+      name,
+      color: MEMBER_COLORS[prev.length % MEMBER_COLORS.length],
+    }])
+    setMemberInput('')
+    clearError()
   }
 
-  function toggleTemplate(t: TemplateItem) {
+  function removeMember(id: string) {
+    setMembers(prev => prev.filter(m => m.id !== id))
+  }
+
+  // ── Chore helpers ─────────────────────────────────────────────────────────
+  function toggleTemplate(idx: number) {
     setSelectedTemplates(prev => {
-      const exists = prev.some(x => x.name === t.name)
-      return exists ? prev.filter(x => x.name !== t.name) : [...prev, t]
+      const next = new Set(prev)
+      next.has(idx) ? next.delete(idx) : next.add(idx)
+      return next
     })
   }
 
-  function isTemplateSelected(t: TemplateItem) {
-    return selectedTemplates.some(x => x.name === t.name)
+  function buildChores() {
+    const items: ChoreItem[] = []
+    selectedTemplates.forEach(idx => {
+      const t = CHORE_TEMPLATES[idx]
+      items.push({
+        emoji: t.emoji, name: t.name, points: t.points,
+        freq: t.freq, assignTo: 'rotate', isCustom: false,
+      })
+    })
+    return items
   }
 
-  function updateChoreConfig(idx: number, patch: Partial<ChoreConfig>) {
-    setChoreConfigs(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c))
+  function addCustomChore() {
+    setChores(prev => [...prev, {
+      emoji: '✏️', name: '', points: 10,
+      freq: 'weekly', assignTo: 'rotate', isCustom: true,
+    }])
+    setExpandedChore(chores.length)
   }
 
-  function advanceToTemplate() {
+  function updateChore(i: number, patch: Partial<ChoreItem>) {
+    setChores(prev => prev.map((c, idx) => idx === i ? { ...c, ...patch } : c))
+  }
+
+  function removeChore(i: number) {
+    setChores(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  // ── Step transitions ──────────────────────────────────────────────────────
+
+  async function handleSaveAdminName() {
+    const name = adminName.trim()
+    if (!name) { setError('Please enter your name.'); return }
     clearError()
-    setStep('create-template')
+    // Save name to profile
+    const fd = new FormData()
+    fd.append('fullName', name)
+    startTransition(async () => {
+      await updateProfile(fd)
+      setStep('room-name')
+    })
   }
 
-  function advanceToConfigure() {
-    if (selectedTemplates.length === 0 && !customSelected) {
-      setError('Please select at least one chore template.')
+  async function handleCreateRoom() {
+    const name = roomName.trim()
+    if (name.length < 2) { setError('Room name must be at least 2 characters.'); return }
+    clearError()
+    const fd = new FormData()
+    fd.append('name', name)
+    startTransition(async () => {
+      const result = await createHousehold(fd)
+      if (result?.error) { setError(result.error); return }
+      if (result?.household) {
+        setHousehold(result.household as { id: string; name: string; invite_code: string })
+        setStep('members')
+      }
+    })
+  }
+
+  function handleMembersNext() {
+    clearError()
+    const built = buildChores()
+    setChores(built)
+    setExpandedChore(0)
+    setStep('chores')
+  }
+
+  function handleChoresNext() {
+    if (selectedTemplates.size === 0 && !chores.some(c => c.isCustom)) {
+      setError('Add at least one chore to continue, or skip to do this later.')
       return
     }
     clearError()
-    const configs = buildChoreConfigs(selectedTemplates, customSelected)
-    setChoreConfigs(configs)
-    setExpandedIdx(0)
-    setStep('create-configure')
+    const built = buildChores()
+    // Merge: keep existing custom chores, replace templates
+    const customs = chores.filter(c => c.isCustom)
+    setChores([...built, ...customs])
+    setExpandedChore(0)
+    setStep('chore-configure')
   }
 
-  function advanceToAssign() {
-    const allNamed = choreConfigs.every(c => c.name.trim().length > 0)
-    if (!allNamed) {
-      setError('Please give every chore a name.')
-      return
-    }
+  function handleConfigureNext() {
+    const unnamed = chores.filter(c => c.isCustom && !c.name.trim())
+    if (unnamed.length) { setError('Give every custom chore a name.'); return }
     clearError()
-    setStep('create-assign')
+    setStep('rotation')
   }
 
-  // ── Join handler ─────────────────────────────────────────────────────────────
+  async function handleFinish() {
+    if (!household) return
+    clearError()
+    startTransition(async () => {
+      for (const chore of chores) {
+        const name = chore.name.trim()
+        if (!name) continue
+        const fd = new FormData()
+        fd.append('household_id', household.id)
+        fd.append('name', name)
+        fd.append('points', String(chore.points))
+        fd.append('frequency', chore.freq)
+        fd.append('category', 'general')
+        const result = await createChore(fd)
+        if (result && 'error' in result && result.error) {
+          setError(result.error)
+          return
+        }
+      }
+      setStep('success')
+    })
+  }
 
-  function handleJoinSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleJoin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     clearError()
     const fd = new FormData(e.currentTarget)
@@ -229,54 +284,6 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
     })
   }
 
-  function handleCodeInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
-    setJoinCode(val)
-  }
-
-  // ── Create household handler ──────────────────────────────────────────────────
-
-  function handleCreateHousehold(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    clearError()
-    const fd = new FormData(e.currentTarget)
-    startTransition(async () => {
-      const result = await createHousehold(fd)
-      if (result?.error) {
-        setError(result.error)
-      } else if (result?.household) {
-        setHousehold(result.household as { id: string; name: string; invite_code: string })
-        advanceToTemplate()
-      }
-    })
-  }
-
-  // ── Final create chores handler ───────────────────────────────────────────────
-
-  function handleFinish() {
-    if (!household) return
-    clearError()
-    startTransition(async () => {
-      for (const cfg of choreConfigs) {
-        const fd = new FormData()
-        fd.append('household_id', household.id)
-        fd.append('name', cfg.name.trim())
-        fd.append('points', String(cfg.points))
-        fd.append('frequency', cfg.frequency)
-        fd.append('category', cfg.category)
-        if (cfg.dueDate) fd.append('due_date', cfg.dueDate)
-        if (assignTo === 'me') fd.append('assigned_to', '__me__')
-        if (judgment === 'ai') fd.append('require_photo', 'true')
-        const result = await createChore(fd)
-        if (result?.error) {
-          setError(result.error)
-          return
-        }
-      }
-      setStep('create-success')
-    })
-  }
-
   async function copyCode() {
     if (!household) return
     await navigator.clipboard.writeText(household.invite_code)
@@ -284,39 +291,27 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
     setTimeout(() => setCopied(false), 2500)
   }
 
-  // ── Progress indicator ────────────────────────────────────────────────────────
-
-  const createStepIdx = CREATE_STEPS.indexOf(step)
-  const showProgress  = createStepIdx !== -1
-
-  // ── Layout ───────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{FONTS}</style>
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(145deg, #FF6B2B 0%, #ff8f5e 50%, #ffb347 100%)',
+        background: 'linear-gradient(145deg, #FF6B2B 0%, #ff8f5e 55%, #ffb347 100%)',
         fontFamily: '"Nunito", sans-serif',
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'flex', flexDirection: 'column',
         alignItems: 'center',
-        padding: '32px 16px 40px',
+        padding: '32px 16px 48px',
       }}>
+
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 10, background: '#fff',
+            width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-            fontSize: 18, color: '#FF6B2B', flexShrink: 0,
-          }}>
-            CS
-          </div>
-          <span style={{
-            fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-            fontSize: 22, color: '#fff', letterSpacing: '-0.3px',
-          }}>
+            fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 16, color: '#fff',
+          }}>CS</div>
+          <span style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#fff' }}>
             ChoreSync
           </span>
         </div>
@@ -326,27 +321,28 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
           width: '100%', maxWidth: 480,
           background: '#fff', borderRadius: 24,
           padding: '28px 24px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
         }}>
-          {/* Progress bar for create steps */}
+
+          {/* Progress bar */}
           {showProgress && (
             <div style={{ marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                {CREATE_STEP_LABELS.map((label, i) => (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, gap: 4 }}>
+                {CREATE_LABELS.map((label, i) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
                     <div style={{
-                      width: 26, height: 26, borderRadius: '50%',
-                      background: createStepIdx > i ? '#FF6B2B' : createStepIdx === i ? '#FF6B2B' : '#E5E7EB',
-                      color: createStepIdx >= i ? '#fff' : '#9CA3AF',
+                      width: 26, height: 26, borderRadius: '50%', marginBottom: 3,
+                      background: stepIdx > i ? '#FF6B2B' : stepIdx === i ? '#FF6B2B' : '#E5E7EB',
+                      color: stepIdx >= i ? '#fff' : '#9CA3AF',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 11,
-                      marginBottom: 3,
+                      transition: 'background 0.3s',
                     }}>
-                      {createStepIdx > i ? '✓' : i + 1}
+                      {stepIdx > i ? '✓' : i + 1}
                     </div>
                     <span style={{
-                      fontSize: 9, fontWeight: 600,
-                      color: createStepIdx === i ? '#FF6B2B' : '#9CA3AF',
+                      fontSize: 9, fontWeight: 700,
+                      color: stepIdx === i ? '#FF6B2B' : '#9CA3AF',
                       textTransform: 'uppercase', letterSpacing: '0.04em',
                     }}>
                       {label}
@@ -354,384 +350,596 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
                   </div>
                 ))}
               </div>
-              <div style={{ height: 4, background: '#E5E7EB', borderRadius: 99 }}>
+              <div style={{ height: 4, background: '#F3F4F6', borderRadius: 99 }}>
                 <div style={{
                   height: '100%', background: '#FF6B2B', borderRadius: 99,
-                  width: `${((createStepIdx + 1) / CREATE_STEPS.length) * 100}%`,
-                  transition: 'width 0.3s ease',
+                  width: `${((stepIdx + 1) / CREATE_STEPS.length) * 100}%`,
+                  transition: 'width 0.35s ease',
                 }} />
               </div>
             </div>
           )}
 
-          {/* Error banner */}
+          {/* Error */}
           {error && (
             <div style={{
-              background: '#fef2f2', color: '#dc2626',
-              borderRadius: 12, padding: '10px 14px',
-              fontSize: 13, fontWeight: 600,
-              marginBottom: 16, lineHeight: 1.4,
+              background: '#FEF2F2', color: '#DC2626', borderRadius: 12,
+              padding: '10px 14px', fontSize: 13, fontWeight: 600,
+              marginBottom: 16, lineHeight: 1.5,
             }}>
               {error}
             </div>
           )}
 
-          {/* ── STEP: choice ─────────────────────────────────────────────── */}
-          {step === 'choice' && (
+          {/* ── WELCOME ─────────────────────────────────────────────────────── */}
+          {step === 'welcome' && (
             <div>
-              <p style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                fontSize: 15, color: '#FF6B2B', margin: '0 0 4px', textAlign: 'center',
-              }}>
-                Hey, {displayName}!
-              </p>
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 22, color: '#111827', margin: '0 0 6px', textAlign: 'center',
-              }}>
-                Let&apos;s get you set up
-              </h2>
-              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 24px', textAlign: 'center' }}>
-                Join an existing household or create your own.
-              </p>
+              <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                <div style={{ fontSize: 52, marginBottom: 12 }}>🏡</div>
+                <h1 style={{
+                  fontFamily: '"Poppins", sans-serif', fontWeight: 800,
+                  fontSize: 26, color: '#111827', margin: '0 0 8px',
+                }}>
+                  Welcome to ChoreSync
+                </h1>
+                <p style={{ fontSize: 14, color: '#6B7280', margin: 0, lineHeight: 1.6 }}>
+                  Sync chores with your household.<br />Create a room or join one.
+                </p>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Create */}
+                {/* Create Room */}
                 <button
                   type="button"
-                  onClick={() => { clearError(); setStep('create-name') }}
+                  onClick={() => { clearError(); setStep('admin-name') }}
                   style={{
                     background: '#FF6B2B', border: 'none', borderRadius: 18,
-                    padding: '20px 20px', cursor: 'pointer', textAlign: 'left',
+                    padding: '22px 20px', cursor: 'pointer', textAlign: 'left',
                     boxShadow: '0 6px 20px rgba(255,107,43,0.35)',
-                    transition: 'transform 0.15s, box-shadow 0.15s',
                   }}
                 >
-                  <div style={{ fontSize: 32, marginBottom: 6 }}>🏡</div>
+                  <div style={{ fontSize: 34, marginBottom: 8 }}>🏡</div>
                   <p style={{
                     fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                    fontSize: 16, color: '#fff', margin: '0 0 3px',
+                    fontSize: 17, color: '#fff', margin: '0 0 4px',
                   }}>
-                    Create a Household
+                    Create Room
                   </p>
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', margin: 0 }}>
-                    Set up chores &amp; invite your crew
+                    Set up your household and invite people
                   </p>
                 </button>
 
-                {/* Join */}
+                {/* Join Room */}
                 <button
                   type="button"
                   onClick={() => { clearError(); setStep('join') }}
                   style={{
-                    background: '#fff', border: '2px solid #E5E7EB', borderRadius: 18,
-                    padding: '20px 20px', cursor: 'pointer', textAlign: 'left',
-                    transition: 'border-color 0.15s',
+                    background: '#fff', border: '2px solid #E5E7EB',
+                    borderRadius: 18, padding: '22px 20px',
+                    cursor: 'pointer', textAlign: 'left',
                   }}
                 >
-                  <div style={{ fontSize: 32, marginBottom: 6 }}>🔑</div>
+                  <div style={{ fontSize: 34, marginBottom: 8 }}>🔑</div>
                   <p style={{
                     fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                    fontSize: 16, color: '#111827', margin: '0 0 3px',
+                    fontSize: 17, color: '#111827', margin: '0 0 4px',
                   }}>
-                    Join a Household
+                    Join Room
                   </p>
                   <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                    Enter your housemate&apos;s invite code
+                    Enter your housemate's invite code
                   </p>
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── STEP: join ───────────────────────────────────────────────── */}
+          {/* ── JOIN ────────────────────────────────────────────────────────── */}
           {step === 'join' && (
             <div>
-              <BackButton onClick={() => { clearError(); setStep('choice') }} label="Back to choice" />
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🔑</div>
-                <h2 style={{
-                  fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                  fontSize: 20, color: '#111827', margin: '0 0 6px',
-                }}>
-                  Join a Household
+              <BackBtn onClick={() => { clearError(); setStep('welcome') }} />
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🔑</div>
+                <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 6px' }}>
+                  Join a Room
                 </h2>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                  Enter the 6-character code your housemate shared
+                  Enter the 6-character code from your housemate
                 </p>
               </div>
-
-              <form onSubmit={handleJoinSubmit}>
+              <form onSubmit={handleJoin}>
                 <input type="hidden" name="code" value={joinCode} />
-                <div style={{ marginBottom: 20 }}>
-                  <input
-                    type="text"
-                    value={joinCode}
-                    onChange={handleCodeInput}
-                    placeholder="ABC123"
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={6}
-                    style={{
-                      ...inputStyle,
-                      textAlign: 'center',
-                      fontFamily: 'monospace',
-                      fontSize: 32,
-                      fontWeight: 800,
-                      letterSpacing: '0.45em',
-                      padding: '16px 14px',
-                      border: '2px solid #E5E7EB',
-                      borderRadius: 16,
-                      color: '#FF6B2B',
-                    }}
-                  />
-                  <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>
-                    Letters and numbers only — not case-sensitive.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isPending || joinCode.length < 6}
-                  style={primaryBtnStyle(isPending || joinCode.length < 6)}
-                >
-                  {isPending ? 'Joining…' : 'Join Household →'}
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                  placeholder="ABC123"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  style={{
+                    ...inputStyle,
+                    textAlign: 'center', fontSize: 34, fontFamily: 'monospace',
+                    fontWeight: 900, letterSpacing: '0.45em',
+                    padding: '16px 14px', color: '#FF6B2B',
+                    marginBottom: 8, border: '2px solid #E5E7EB',
+                  }}
+                />
+                <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', margin: '0 0 20px' }}>
+                  Not case-sensitive · letters &amp; numbers only
+                </p>
+                <button type="submit" disabled={isPending || joinCode.length < 6} style={primaryBtn(isPending || joinCode.length < 6)}>
+                  {isPending ? 'Joining…' : 'Join Room →'}
                 </button>
               </form>
             </div>
           )}
 
-          {/* ── STEP: create-name ────────────────────────────────────────── */}
-          {step === 'create-name' && (
+          {/* ── ADMIN NAME ──────────────────────────────────────────────────── */}
+          {step === 'admin-name' && (
             <div>
-              <BackButton onClick={() => { clearError(); setStep('choice') }} label="Back to choice" />
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🏡</div>
-                <h2 style={{
-                  fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                  fontSize: 20, color: '#111827', margin: '0 0 6px',
-                }}>
-                  Name your household
+              <BackBtn onClick={() => { clearError(); setStep('welcome') }} />
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>👋</div>
+                <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 6px' }}>
+                  What's your name?
                 </h2>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                  This is how your housemates will identify your home.
+                  This is how you'll appear to your housemates.
                 </p>
               </div>
 
-              <form onSubmit={handleCreateHousehold}>
-                <div style={{ marginBottom: 20 }}>
-                  <label style={labelStyle}>Household name</label>
-                  <input
-                    name="name"
-                    type="text"
-                    required
-                    maxLength={80}
-                    placeholder='e.g. "The Smith House" or "Apt 4B"'
-                    autoFocus
-                    style={{ ...inputStyle, textAlign: 'center', fontSize: 16, fontWeight: 700 }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  style={primaryBtnStyle(isPending)}
-                >
-                  {isPending ? 'Creating…' : 'Continue →'}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* ── STEP: create-template ────────────────────────────────────── */}
-          {step === 'create-template' && (
-            <div>
-              <BackButton onClick={() => { clearError(); setStep('create-name') }} label="Back" />
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 20, color: '#111827', margin: '0 0 4px',
-              }}>
-                Choose chores
-              </h2>
-              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
-                Select all that apply — you can add more later.
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {TEMPLATES.map((t, idx) => {
-                  const sel = isTemplateSelected(t)
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => toggleTemplate(t)}
-                      style={{
-                        background: '#fff',
-                        border: `2px solid ${sel ? '#FF6B2B' : '#F0F0F0'}`,
-                        borderRadius: 16, padding: '14px 10px', cursor: 'pointer',
-                        textAlign: 'left',
-                        boxShadow: sel ? '0 0 0 3px rgba(255,107,43,0.15)' : 'none',
-                        transition: 'border-color 0.15s, box-shadow 0.15s',
-                      }}
-                    >
-                      <div style={{ fontSize: 24, marginBottom: 5 }}>{t.emoji}</div>
-                      <p style={{
-                        fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                        fontSize: 11, color: '#111827', margin: '0 0 3px',
-                      }}>
-                        {t.name}
-                      </p>
-                      <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>
-                        🏆 {t.defaultPoints} pts
-                      </p>
-                    </button>
-                  )
-                })}
-
-                {/* Custom card */}
-                <button
-                  type="button"
-                  onClick={() => setCustomSelected(v => !v)}
-                  style={{
-                    background: customSelected ? '#FFF3EE' : '#fff',
-                    border: `2px solid ${customSelected ? '#FF6B2B' : '#F0F0F0'}`,
-                    borderRadius: 16, padding: '14px 10px', cursor: 'pointer',
-                    textAlign: 'left',
-                    boxShadow: customSelected ? '0 0 0 3px rgba(255,107,43,0.15)' : 'none',
-                    transition: 'border-color 0.15s, box-shadow 0.15s',
-                  }}
-                >
-                  <div style={{ fontSize: 24, marginBottom: 5 }}>✏️</div>
-                  <p style={{
-                    fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                    fontSize: 11, color: '#111827', margin: '0 0 3px',
-                  }}>
-                    Custom
-                  </p>
-                  <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>Write your own</p>
-                </button>
-              </div>
-
+              <label style={labelStyle}>Your name</label>
+              <input
+                type="text"
+                value={adminName}
+                onChange={e => setAdminName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSaveAdminName()}
+                placeholder="e.g. Jordan Rivera"
+                autoFocus
+                maxLength={60}
+                style={{ ...inputStyle, marginBottom: 20, fontSize: 16 }}
+              />
               <button
                 type="button"
-                onClick={advanceToConfigure}
-                disabled={selectedTemplates.length === 0 && !customSelected}
-                style={primaryBtnStyle(selectedTemplates.length === 0 && !customSelected)}
+                onClick={handleSaveAdminName}
+                disabled={isPending || !adminName.trim()}
+                style={primaryBtn(isPending || !adminName.trim())}
               >
-                {selectedTemplates.length + (customSelected ? 1 : 0) > 0
-                  ? `Continue with ${selectedTemplates.length + (customSelected ? 1 : 0)} chore${selectedTemplates.length + (customSelected ? 1 : 0) !== 1 ? 's' : ''} →`
-                  : 'Select at least one chore'}
+                {isPending ? 'Saving…' : 'Continue →'}
               </button>
             </div>
           )}
 
-          {/* ── STEP: create-configure ───────────────────────────────────── */}
-          {step === 'create-configure' && (
+          {/* ── ROOM NAME ───────────────────────────────────────────────────── */}
+          {step === 'room-name' && (
             <div>
-              <BackButton onClick={() => { clearError(); setStep('create-template') }} label="Back" />
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 20, color: '#111827', margin: '0 0 4px',
-              }}>
+              <BackBtn onClick={() => { clearError(); setStep('admin-name') }} />
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🏡</div>
+                <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 6px' }}>
+                  Name your Room
+                </h2>
+                <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+                  Give your household a name your crew will recognize.
+                </p>
+              </div>
+
+              <label style={labelStyle}>Room name</label>
+              <input
+                type="text"
+                value={roomName}
+                onChange={e => setRoomName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateRoom()}
+                placeholder='e.g. "Sunrise Apt" or "The Smith House"'
+                autoFocus
+                maxLength={80}
+                style={{ ...inputStyle, marginBottom: 8, fontSize: 15, textAlign: 'center', fontWeight: 700 }}
+              />
+              <p style={{ fontSize: 12, color: '#9CA3AF', margin: '0 0 20px', textAlign: 'center' }}>
+                You can rename this anytime from settings.
+              </p>
+              <button
+                type="button"
+                onClick={handleCreateRoom}
+                disabled={isPending || roomName.trim().length < 2}
+                style={primaryBtn(isPending || roomName.trim().length < 2)}
+              >
+                {isPending ? 'Creating…' : 'Continue →'}
+              </button>
+            </div>
+          )}
+
+          {/* ── MEMBERS ─────────────────────────────────────────────────────── */}
+          {step === 'members' && (
+            <div>
+              <BackBtn onClick={() => { clearError(); setStep('room-name') }} />
+              <div style={{ marginBottom: 20 }}>
+                <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 4px' }}>
+                  Who lives with you?
+                </h2>
+                <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+                  Add your housemates' names so you can assign chores. They'll join using your invite code later.
+                </p>
+              </div>
+
+              {/* Input row */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <input
+                  type="text"
+                  value={memberInput}
+                  onChange={e => { setMemberInput(e.target.value); clearError() }}
+                  onKeyDown={e => e.key === 'Enter' && addMember()}
+                  placeholder="Housemate's name…"
+                  maxLength={40}
+                  style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
+                />
+                <button
+                  type="button"
+                  onClick={addMember}
+                  disabled={!memberInput.trim()}
+                  style={{
+                    padding: '0 18px', borderRadius: 12, border: 'none',
+                    background: memberInput.trim() ? '#FF6B2B' : '#E5E7EB',
+                    color: memberInput.trim() ? '#fff' : '#9CA3AF',
+                    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15,
+                    cursor: memberInput.trim() ? 'pointer' : 'default', flexShrink: 0,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Member list */}
+              {members.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {/* Current user (you) */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: '#FFF8F5', borderRadius: 12, padding: '10px 14px',
+                    border: '1.5px solid #FFD5C2',
+                  }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: '50%', background: '#FF6B2B',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0,
+                    }}>
+                      {adminName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'ME'}
+                    </div>
+                    <span style={{ flex: 1, fontWeight: 700, fontSize: 14, color: '#111827' }}>
+                      {adminName.trim()} <span style={{ fontSize: 11, color: '#FF6B2B', fontWeight: 700 }}>(You · Admin)</span>
+                    </span>
+                  </div>
+
+                  {members.map(m => (
+                    <div key={m.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      background: '#F9FAFB', borderRadius: 12, padding: '10px 14px',
+                      border: '1.5px solid #E5E7EB',
+                    }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: '50%', background: m.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0,
+                      }}>
+                        {m.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                      </div>
+                      <span style={{ flex: 1, fontWeight: 700, fontSize: 14, color: '#111827' }}>{m.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeMember(m.id)}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#D1D5DB', fontSize: 18, lineHeight: 1, padding: '0 2px',
+                        }}
+                        aria-label="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {members.length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '20px 0',
+                  color: '#D1D5DB', fontSize: 13, marginBottom: 16,
+                }}>
+                  No housemates added yet — you can also skip this and invite later.
+                </div>
+              )}
+
+              <button type="button" onClick={handleMembersNext} style={primaryBtn(false)}>
+                {members.length === 0 ? 'Skip for now →' : `Continue with ${members.length + 1} people →`}
+              </button>
+            </div>
+          )}
+
+          {/* ── CHORES ──────────────────────────────────────────────────────── */}
+          {step === 'chores' && (
+            <div>
+              <BackBtn onClick={() => { clearError(); setStep('members') }} />
+              <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 4px' }}>
+                Add your chores
+              </h2>
+              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
+                Pick common ones or create your own. Points are awarded on completion.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                {CHORE_TEMPLATES.map((t, i) => {
+                  const sel = selectedTemplates.has(i)
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleTemplate(i)}
+                      style={{
+                        background: sel ? '#FFF3EE' : '#fff',
+                        border: `2px solid ${sel ? '#FF6B2B' : '#F0F0F0'}`,
+                        borderRadius: 14, padding: '12px 10px', cursor: 'pointer',
+                        textAlign: 'left',
+                        boxShadow: sel ? '0 0 0 3px rgba(255,107,43,0.12)' : 'none',
+                        transition: 'all 0.15s',
+                        position: 'relative',
+                      }}
+                    >
+                      {sel && (
+                        <div style={{
+                          position: 'absolute', top: 6, right: 8,
+                          width: 18, height: 18, borderRadius: '50%',
+                          background: '#FF6B2B', color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 10, fontWeight: 900,
+                        }}>✓</div>
+                      )}
+                      <div style={{ fontSize: 22, marginBottom: 5 }}>{t.emoji}</div>
+                      <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 11, color: '#111827', margin: '0 0 3px' }}>
+                        {t.name}
+                      </p>
+                      <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>🏆 {t.points} pts</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <div style={{ flex: 1, height: 1, background: '#F0F0F0' }} />
+                <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 600 }}>or</span>
+                <div style={{ flex: 1, height: 1, background: '#F0F0F0' }} />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const built = buildChores()
+                  const customs = chores.filter(c => c.isCustom)
+                  const merged = [...built, ...customs]
+                  setChores(merged)
+                  addCustomChore()
+                  clearError()
+                  setStep('chore-configure')
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  width: '100%', padding: '12px', borderRadius: 14,
+                  border: '2px dashed #E5E7EB', background: '#F9FAFB',
+                  color: '#6B7280', cursor: 'pointer', marginBottom: 16,
+                  fontFamily: '"Nunito", sans-serif', fontWeight: 700, fontSize: 13,
+                  transition: 'all 0.15s',
+                }}
+              >
+                ✏️ Create a custom chore
+              </button>
+
+              <button
+                type="button"
+                onClick={handleChoresNext}
+                disabled={selectedTemplates.size === 0}
+                style={selectedTemplates.size === 0
+                  ? { ...primaryBtn(true) }
+                  : primaryBtn(false)
+                }
+              >
+                {selectedTemplates.size === 0
+                  ? 'Select chores to continue'
+                  : `Continue with ${selectedTemplates.size} chore${selectedTemplates.size !== 1 ? 's' : ''} →`}
+              </button>
+            </div>
+          )}
+
+          {/* ── CHORE CONFIGURE ─────────────────────────────────────────────── */}
+          {step === 'chore-configure' && (
+            <div>
+              <BackBtn onClick={() => { clearError(); setStep('chores') }} />
+              <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 4px' }}>
                 Configure chores
               </h2>
               <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
-                Set the details for each chore.
+                Set points, frequency, and who's assigned. You can change these anytime.
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {choreConfigs.map((cfg, idx) => {
-                  const isOpen = expandedIdx === idx
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {chores.map((chore, i) => {
+                  const open = expandedChore === i
                   return (
-                    <div key={idx} style={{
-                      border: `2px solid ${isOpen ? '#FF6B2B' : '#F0F0F0'}`,
-                      borderRadius: 16, overflow: 'hidden',
-                      boxShadow: isOpen ? '0 0 0 3px rgba(255,107,43,0.1)' : 'none',
-                      transition: 'border-color 0.15s',
+                    <div key={i} style={{
+                      border: `2px solid ${open ? '#FF6B2B' : '#F0F0F0'}`,
+                      borderRadius: 14, overflow: 'hidden',
+                      boxShadow: open ? '0 0 0 3px rgba(255,107,43,0.1)' : 'none',
                     }}>
-                      {/* Accordion header */}
+                      {/* Header */}
                       <button
                         type="button"
-                        onClick={() => setExpandedIdx(isOpen ? -1 : idx)}
+                        onClick={() => setExpandedChore(open ? -1 : i)}
                         style={{
                           width: '100%', textAlign: 'left',
-                          background: isOpen ? '#FFF8F5' : '#fff',
+                          background: open ? '#FFF8F5' : '#fff',
                           border: 'none', cursor: 'pointer',
                           padding: '12px 14px',
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>
-                            {cfg.template?.emoji ?? '✏️'}
-                          </span>
-                          <span style={{
-                            fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                            fontSize: 14, color: '#111827',
-                          }}>
-                            {cfg.name || 'Custom chore'}
+                          <span style={{ fontSize: 20 }}>{chore.emoji}</span>
+                          <span style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 14, color: '#111827' }}>
+                            {chore.name || 'Custom chore'} <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600 }}>· {chore.points} pts</span>
                           </span>
                         </div>
-                        <span style={{ fontSize: 18, color: '#9CA3AF' }}>{isOpen ? '▲' : '▼'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); removeChore(i) }}
+                            style={{ background: 'none', border: 'none', color: '#D1D5DB', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+                            aria-label="Remove chore"
+                          >×</button>
+                          <span style={{ color: '#9CA3AF', fontSize: 16 }}>{open ? '▲' : '▼'}</span>
+                        </div>
                       </button>
 
-                      {/* Accordion body */}
-                      {isOpen && (
-                        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* Body */}
+                      {open && (
+                        <div style={{ padding: '0 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {/* Name (custom only) */}
+                          {chore.isCustom && (
+                            <div>
+                              <label style={labelStyle}>Chore name</label>
+                              <input
+                                type="text"
+                                value={chore.name}
+                                onChange={e => updateChore(i, { name: e.target.value })}
+                                placeholder="e.g. Clean the garage"
+                                style={inputStyle}
+                                autoFocus
+                              />
+                            </div>
+                          )}
+
+                          {/* Points */}
                           <div>
-                            <label style={labelStyle}>Chore name</label>
-                            <input
-                              type="text"
-                              value={cfg.name}
-                              onChange={e => updateChoreConfig(idx, { name: e.target.value })}
-                              placeholder="e.g. Sweep the kitchen floor"
-                              style={inputStyle}
-                            />
+                            <label style={labelStyle}>Points  <span style={{ color: '#9CA3AF', fontWeight: 600 }}>({chore.points} pts)</span></label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <input
+                                type="range"
+                                min={1} max={50}
+                                value={chore.points}
+                                onChange={e => updateChore(i, { points: Number(e.target.value) })}
+                                style={{ flex: 1, accentColor: '#FF6B2B' }}
+                              />
+                              <span style={{
+                                width: 42, height: 32, borderRadius: 8,
+                                background: '#FFF3EE', border: '1.5px solid #FFD5C2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: 800, fontSize: 13, color: '#FF6B2B', flexShrink: 0,
+                              }}>
+                                {chore.points}
+                              </span>
+                            </div>
                           </div>
 
-                          <div>
-                            <label style={labelStyle}>Points</label>
-                            <input
-                              type="number"
-                              min={1} max={100}
-                              value={cfg.points}
-                              onChange={e => updateChoreConfig(idx, { points: Number(e.target.value) })}
-                              style={inputStyle}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={labelStyle}>Due date (optional)</label>
-                            <input
-                              type="date"
-                              value={cfg.dueDate}
-                              onChange={e => updateChoreConfig(idx, { dueDate: e.target.value })}
-                              style={inputStyle}
-                            />
-                          </div>
-
+                          {/* Frequency */}
                           <div>
                             <label style={labelStyle}>Frequency</label>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {FREQUENCIES.map(f => (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                              {['daily','weekly','monthly','one-time'].map(f => (
                                 <button
                                   key={f}
                                   type="button"
-                                  onClick={() => updateChoreConfig(idx, { frequency: f })}
+                                  onClick={() => updateChore(i, { freq: f })}
                                   style={{
-                                    padding: '7px 12px', borderRadius: 99,
-                                    border: `2px solid ${cfg.frequency === f ? '#FF6B2B' : '#E5E7EB'}`,
-                                    background: cfg.frequency === f ? '#FFF3EE' : '#fff',
-                                    color: cfg.frequency === f ? '#FF6B2B' : '#6B7280',
-                                    fontFamily: '"Nunito", sans-serif', fontWeight: 700, fontSize: 12,
-                                    cursor: 'pointer', textTransform: 'capitalize' as const,
-                                    transition: 'all 0.15s',
+                                    padding: '6px 12px', borderRadius: 99, fontSize: 12, fontWeight: 700,
+                                    fontFamily: '"Nunito", sans-serif', cursor: 'pointer',
+                                    border: `2px solid ${chore.freq === f ? '#FF6B2B' : '#E5E7EB'}`,
+                                    background: chore.freq === f ? '#FFF3EE' : '#fff',
+                                    color: chore.freq === f ? '#FF6B2B' : '#6B7280',
+                                    textTransform: 'capitalize' as const, transition: 'all 0.15s',
                                   }}
                                 >
                                   {f}
                                 </button>
                               ))}
+                            </div>
+                          </div>
+
+                          {/* Assign */}
+                          <div>
+                            <label style={labelStyle}>Assign to</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {/* Rotate option */}
+                              <button
+                                type="button"
+                                onClick={() => updateChore(i, { assignTo: 'rotate' })}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 10,
+                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  border: `2px solid ${chore.assignTo === 'rotate' ? '#FF6B2B' : '#E5E7EB'}`,
+                                  background: chore.assignTo === 'rotate' ? '#FFF3EE' : '#fff',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <span style={{ fontSize: 18 }}>🔄</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Rotate (everyone takes turns)</span>
+                              </button>
+
+                              {/* Me option */}
+                              <button
+                                type="button"
+                                onClick={() => updateChore(i, { assignTo: 'me' })}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 10,
+                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  border: `2px solid ${chore.assignTo === 'me' ? '#FF6B2B' : '#E5E7EB'}`,
+                                  background: chore.assignTo === 'me' ? '#FFF3EE' : '#fff',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <span style={{ fontSize: 18 }}>😊</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Me ({adminName.split(' ')[0]})</span>
+                              </button>
+
+                              {/* Named members */}
+                              {members.map(m => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => updateChore(i, { assignTo: m.name })}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                    border: `2px solid ${chore.assignTo === m.name ? '#FF6B2B' : '#E5E7EB'}`,
+                                    background: chore.assignTo === m.name ? '#FFF3EE' : '#fff',
+                                    textAlign: 'left',
+                                  }}
+                                >
+                                  <div style={{
+                                    width: 24, height: 24, borderRadius: '50%', background: m.color,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 9, fontWeight: 800, color: '#fff', flexShrink: 0,
+                                  }}>
+                                    {m.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                  </div>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{m.name}</span>
+                                </button>
+                              ))}
+
+                              {/* Unassigned */}
+                              <button
+                                type="button"
+                                onClick={() => updateChore(i, { assignTo: 'unassigned' })}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 10,
+                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  border: `2px solid ${chore.assignTo === 'unassigned' ? '#FF6B2B' : '#E5E7EB'}`,
+                                  background: chore.assignTo === 'unassigned' ? '#FFF3EE' : '#fff',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <span style={{ fontSize: 18 }}>👥</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Leave unassigned</span>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -741,193 +949,89 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
                 })}
               </div>
 
+              {/* Add another custom */}
               <button
                 type="button"
-                onClick={advanceToAssign}
-                style={primaryBtnStyle(false)}
+                onClick={addCustomChore}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  width: '100%', padding: '11px', borderRadius: 12,
+                  border: '2px dashed #E5E7EB', background: '#F9FAFB',
+                  color: '#6B7280', cursor: 'pointer', marginBottom: 16,
+                  fontFamily: '"Nunito", sans-serif', fontWeight: 700, fontSize: 13,
+                }}
               >
+                + Add another chore
+              </button>
+
+              <button type="button" onClick={handleConfigureNext} style={primaryBtn(false)}>
                 Continue →
               </button>
             </div>
           )}
 
-          {/* ── STEP: create-assign ──────────────────────────────────────── */}
-          {step === 'create-assign' && (
+          {/* ── ROTATION ────────────────────────────────────────────────────── */}
+          {step === 'rotation' && (
             <div>
-              <BackButton onClick={() => { clearError(); setStep('create-configure') }} label="Back" />
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 20, color: '#111827', margin: '0 0 4px',
-              }}>
-                Assign chores
+              <BackBtn onClick={() => { clearError(); setStep('chore-configure') }} />
+              <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 4px' }}>
+                Rotation &amp; assignment
               </h2>
-              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
-                Who should be responsible for these chores?
+              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 20px' }}>
+                How should chores rotate between household members over time?
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                {/* Assign to me */}
-                <button
-                  type="button"
-                  onClick={() => setAssignTo('me')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    background: assignTo === 'me' ? '#FFF3EE' : '#fff',
-                    border: `2px solid ${assignTo === 'me' ? '#FF6B2B' : '#F0F0F0'}`,
-                    borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
-                    boxShadow: assignTo === 'me' ? '0 0 0 3px rgba(255,107,43,0.1)' : 'none',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{
-                    width: 42, height: 42, borderRadius: '50%',
-                    background: '#FF6B2B', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20,
-                  }}>
-                    😊
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <p style={{
-                      fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                      fontSize: 14, color: '#111827', margin: '0 0 2px',
-                    }}>
-                      Assign to me <span style={{ color: '#FF6B2B', fontSize: 12 }}>(You)</span>
-                    </p>
-                    <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
-                      You&apos;ll be responsible for these chores
-                    </p>
-                  </div>
-                </button>
-
-                {/* Leave unassigned */}
-                <button
-                  type="button"
-                  onClick={() => setAssignTo('unassigned')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    background: assignTo === 'unassigned' ? '#FFF3EE' : '#fff',
-                    border: `2px solid ${assignTo === 'unassigned' ? '#FF6B2B' : '#F0F0F0'}`,
-                    borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
-                    boxShadow: assignTo === 'unassigned' ? '0 0 0 3px rgba(255,107,43,0.1)' : 'none',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{
-                    width: 42, height: 42, borderRadius: '50%',
-                    background: '#F3F4F6', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20,
-                  }}>
-                    👥
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <p style={{
-                      fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                      fontSize: 14, color: '#111827', margin: '0 0 2px',
-                    }}>
-                      Leave unassigned
-                    </p>
-                    <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
-                      Assign after inviting members
-                    </p>
-                  </div>
-                </button>
-
-                {/* Rotation disabled notice */}
-                <div style={{
-                  background: '#F9FAFB', border: '2px solid #E5E7EB',
-                  borderRadius: 14, padding: '14px 16px', opacity: 0.6,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{
-                      width: 42, height: 42, borderRadius: '50%',
-                      background: '#E5E7EB', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 20,
-                    }}>
-                      🔄
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <p style={{
-                        fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                        fontSize: 14, color: '#6B7280', margin: '0 0 2px',
-                      }}>
-                        Rotate after completion
-                      </p>
-                      <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
-                        Add members first to enable rotation
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tip */}
-              <div style={{
-                background: '#FFF8F0', borderRadius: 12, padding: '10px 14px',
-                fontSize: 12, color: '#92400E', marginBottom: 20,
-              }}>
-                💡 You can reassign chores anytime after inviting housemates.
-              </div>
-
-              <button
-                type="button"
-                onClick={() => { clearError(); setStep('create-judgment') }}
-                style={primaryBtnStyle(false)}
-              >
-                Continue →
-              </button>
-            </div>
-          )}
-
-          {/* ── STEP: create-judgment ────────────────────────────────────── */}
-          {step === 'create-judgment' && (
-            <div>
-              <BackButton onClick={() => { clearError(); setStep('create-assign') }} label="Back" />
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 20, color: '#111827', margin: '0 0 4px',
-              }}>
-                Judgment system
-              </h2>
-              <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
-                How should chore completion be verified?
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {JUDGMENT_OPTIONS.map(opt => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+                {[
+                  {
+                    id: 'round-robin' as const,
+                    emoji: '🔄',
+                    title: 'Round Robin',
+                    desc: 'Chores automatically cycle to the next person each week. Fair and predictable.',
+                    badge: 'Recommended',
+                  },
+                  {
+                    id: 'manual' as const,
+                    emoji: '✋',
+                    title: 'Manual assignment',
+                    desc: 'You (the admin) assign each chore to specific people. Full control.',
+                    badge: null,
+                  },
+                  {
+                    id: 'random' as const,
+                    emoji: '🎲',
+                    title: 'Random',
+                    desc: 'Chores are randomly assigned each week. Keeps things unpredictable.',
+                    badge: null,
+                  },
+                ].map(opt => (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => !opt.disabled && setJudgment(opt.id)}
-                    disabled={opt.disabled}
+                    onClick={() => setRotationType(opt.id)}
                     style={{
                       position: 'relative', textAlign: 'left',
-                      background: judgment === opt.id ? '#FFF3EE' : opt.disabled ? '#FAFAFA' : '#fff',
-                      border: `2px solid ${judgment === opt.id ? '#FF6B2B' : '#F0F0F0'}`,
-                      borderRadius: 16, padding: '16px', cursor: opt.disabled ? 'default' : 'pointer',
-                      opacity: opt.disabled ? 0.65 : 1,
-                      boxShadow: judgment === opt.id ? '0 0 0 3px rgba(255,107,43,0.12)' : 'none',
+                      background: rotationType === opt.id ? '#FFF3EE' : '#fff',
+                      border: `2px solid ${rotationType === opt.id ? '#FF6B2B' : '#F0F0F0'}`,
+                      borderRadius: 16, padding: '16px',
+                      cursor: 'pointer',
+                      boxShadow: rotationType === opt.id ? '0 0 0 3px rgba(255,107,43,0.12)' : 'none',
                       transition: 'all 0.15s',
                     }}
                   >
-                    {opt.disabled && (
+                    {opt.badge && (
                       <span style={{
                         position: 'absolute', top: 12, right: 12,
-                        fontSize: 10, fontWeight: 700, color: '#6B7280',
-                        background: '#F3F4F6', borderRadius: 99, padding: '2px 8px',
+                        fontSize: 10, fontWeight: 700, padding: '2px 8px',
+                        borderRadius: 99, background: '#EAF3DE', color: '#27500A',
                       }}>
-                        Coming Soon
+                        {opt.badge}
                       </span>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 28, flexShrink: 0 }}>{opt.icon}</span>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <span style={{ fontSize: 28, flexShrink: 0 }}>{opt.emoji}</span>
                       <div>
-                        <p style={{
-                          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-                          fontSize: 15, color: '#111827', margin: '0 0 3px',
-                        }}>
+                        <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15, color: '#111827', margin: '0 0 4px' }}>
                           {opt.title}
                         </p>
                         <p style={{ fontSize: 13, color: '#6B7280', margin: 0, lineHeight: 1.4 }}>
@@ -939,59 +1043,79 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
                 ))}
               </div>
 
+              {/* Preview */}
+              {chores.length > 0 && members.length > 0 && (
+                <div style={{
+                  background: '#F9FAFB', borderRadius: 14, padding: '14px 16px',
+                  marginBottom: 20, border: '1.5px solid #E5E7EB',
+                }}>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+                    Preview — Week 1
+                  </p>
+                  {chores.slice(0, 4).map((chore, i) => {
+                    const allPeople = [adminName.split(' ')[0], ...members.map(m => m.name.split(' ')[0])]
+                    const person = rotationType === 'random'
+                      ? allPeople[Math.floor(Math.random() * allPeople.length)]
+                      : allPeople[i % allPeople.length]
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '6px 0', borderBottom: i < Math.min(chores.length, 4) - 1 ? '0.5px solid #E5E7EB' : 'none',
+                      }}>
+                        <span style={{ fontSize: 13, color: '#374151' }}>{chore.emoji} {chore.name}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B2B' }}>
+                          {rotationType === 'manual' ? (chore.assignTo === 'me' ? adminName.split(' ')[0] : chore.assignTo === 'rotate' ? '—' : chore.assignTo) : person}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {chores.length > 4 && (
+                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '8px 0 0', textAlign: 'center' }}>
+                      +{chores.length - 4} more chores
+                    </p>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleFinish}
                 disabled={isPending}
-                style={{
-                  ...primaryBtnStyle(isPending),
-                  background: isPending ? '#E5E7EB' : '#10B981',
-                  boxShadow: isPending ? 'none' : '0 4px 14px rgba(16,185,129,0.35)',
-                }}
+                style={{ ...primaryBtn(isPending), background: isPending ? '#E5E7EB' : '#10B981', boxShadow: isPending ? 'none' : '0 4px 14px rgba(16,185,129,0.35)' }}
               >
-                {isPending ? 'Setting up…' : 'Create Household →'}
+                {isPending ? 'Setting up your room…' : '🎉 Create Room'}
               </button>
             </div>
           )}
 
-          {/* ── STEP: create-success ─────────────────────────────────────── */}
-          {step === 'create-success' && household && (
+          {/* ── SUCCESS ─────────────────────────────────────────────────────── */}
+          {step === 'success' && household && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
-              <h2 style={{
-                fontFamily: '"Poppins", sans-serif', fontWeight: 800,
-                fontSize: 22, color: '#111827', margin: '0 0 6px',
-              }}>
-                Your household is ready!
+              <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
+              <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 24, color: '#111827', margin: '0 0 8px' }}>
+                {household.name} is ready!
               </h2>
-              <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px' }}>
-                Share your invite code with housemates so they can join.
+              <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', lineHeight: 1.6 }}>
+                Share your invite code so housemates can join on their own device.
               </p>
 
-              {/* Invite code display */}
+              {/* Invite code */}
               <div style={{
-                border: '2px dashed #FF6B2B', borderRadius: 18,
-                background: '#FFF8F5', padding: '20px 16px', marginBottom: 8,
+                border: '2px dashed #FF6B2B', borderRadius: 20,
+                background: '#FFF8F5', padding: '22px 16px', marginBottom: 8,
               }}>
-                <p style={{
-                  fontSize: 11, fontWeight: 700, color: '#FF6B2B',
-                  textTransform: 'uppercase', letterSpacing: '0.12em',
-                  margin: '0 0 10px',
-                }}>
+                <p style={{ fontSize: 11, fontWeight: 800, color: '#FF6B2B', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 10px' }}>
                   Invite Code
                 </p>
-                <p style={{
-                  fontFamily: 'monospace', fontSize: 40, fontWeight: 900,
-                  letterSpacing: '0.35em', color: '#FF6B2B', margin: 0,
-                }}>
+                <p style={{ fontFamily: 'monospace', fontSize: 42, fontWeight: 900, letterSpacing: '0.35em', color: '#FF6B2B', margin: 0 }}>
                   {household.invite_code}
                 </p>
               </div>
+
               <p style={{ fontSize: 12, color: '#9CA3AF', margin: '0 0 20px' }}>
-                Your housemates enter this on their Join screen.
+                Housemates enter this on the Join Room screen.
               </p>
 
-              {/* Action buttons */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
                 <button
                   type="button"
@@ -1007,16 +1131,10 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
                 >
                   {copied ? '✓ Copied!' : '📋 Copy code'}
                 </button>
-
                 {typeof navigator !== 'undefined' && 'share' in navigator && (
                   <button
                     type="button"
-                    onClick={() =>
-                      navigator.share({
-                        title: `Join ${household.name} on ChoreSync`,
-                        text: `Use invite code ${household.invite_code} to join our household!`,
-                      })
-                    }
+                    onClick={() => navigator.share({ title: `Join ${household.name}`, text: `Join my household on ChoreSync! Code: ${household.invite_code}` })}
                     style={{
                       flex: 1, padding: '12px', borderRadius: 12,
                       background: '#F3F4F6', border: '2px solid #E5E7EB',
@@ -1033,7 +1151,7 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                style={primaryBtnStyle(false)}
+                style={primaryBtn(false)}
               >
                 Go to Dashboard →
               </button>
@@ -1045,9 +1163,9 @@ export default function OnboardingClient({ displayName }: OnboardingClientProps)
   )
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Back button ──────────────────────────────────────────────────────────────
 
-function BackButton({ onClick, label }: { onClick: () => void; label: string }) {
+function BackBtn({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
@@ -1055,26 +1173,11 @@ function BackButton({ onClick, label }: { onClick: () => void; label: string }) 
       style={{
         background: 'none', border: 'none', cursor: 'pointer', padding: 0,
         display: 'flex', alignItems: 'center', gap: 4,
-        fontFamily: '"Nunito", sans-serif', fontWeight: 700,
-        fontSize: 13, color: '#9CA3AF', marginBottom: 16,
+        fontFamily: '"Nunito", sans-serif', fontWeight: 800,
+        fontSize: 13, color: '#9CA3AF', marginBottom: 18,
       }}
     >
-      ← {label}
+      ← Back
     </button>
   )
-}
-
-// ─── Style helpers ────────────────────────────────────────────────────────────
-
-function primaryBtnStyle(disabled: boolean): React.CSSProperties {
-  return {
-    display: 'block', width: '100%',
-    padding: '14px', borderRadius: 14,
-    background: disabled ? '#E5E7EB' : '#FF6B2B',
-    border: 'none', cursor: disabled ? 'default' : 'pointer',
-    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15,
-    color: disabled ? '#9CA3AF' : '#fff',
-    boxShadow: disabled ? 'none' : '0 4px 14px rgba(255,107,43,0.3)',
-    transition: 'all 0.15s',
-  }
 }
