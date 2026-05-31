@@ -6,52 +6,243 @@ import type { UserRow } from '@/lib/types/database'
 
 export const metadata: Metadata = { title: 'Profile' }
 
-// ── Guest screen (not signed in) ──────────────────────────────────────────────
-function ProfileGuestScreen() {
+// ── Demo profile (shown when not signed in) ───────────────────────────────────
+
+const ICON_BG: Record<string, { bg: string; fg: string }> = {
+  purple: { bg: '#EEEDFE', fg: '#534AB7' },
+  teal:   { bg: '#E1F5EE', fg: '#0F6E56' },
+  amber:  { bg: '#FAEEDA', fg: '#854F0B' },
+  coral:  { bg: '#FAECE7', fg: '#993C1D' },
+  blue:   { bg: '#E6F1FB', fg: '#185FA5' },
+  pink:   { bg: '#FBEAF0', fg: '#993556' },
+}
+
+function DemoIcon({ color, icon }: { color: keyof typeof ICON_BG; icon: string }) {
+  return (
+    <div style={{
+      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 16,
+      background: ICON_BG[color].bg,
+    }}>
+      <span style={{ color: ICON_BG[color].fg }}>{icon}</span>
+    </div>
+  )
+}
+
+function DemoChevron() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C4C4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  )
+}
+
+function DemoRow({
+  color, icon, label, sub, right, last, noChevron,
+}: {
+  color:      keyof typeof ICON_BG
+  icon:       string
+  label:      string
+  labelColor?: string
+  sub?:       string
+  right?:     React.ReactNode
+  last?:      boolean
+  noChevron?: boolean
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '11px 16px',
+      borderBottom: last ? 'none' : '0.5px solid #F3F4F6',
+    }}>
+      <DemoIcon color={color} icon={icon} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600 }}>{label}</span>
+        {sub && <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>{sub}</span>}
+      </div>
+      {right ?? (!noChevron && <DemoChevron />)}
+    </div>
+  )
+}
+
+function DemoSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: '#9CA3AF',
+        padding: '10px 16px 5px',
+        letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+      }}>
+        {title}
+      </div>
+      <div style={{ background: '#fff' }}>{children}</div>
+    </div>
+  )
+}
+
+function ProfileDemoScreen() {
   return (
     <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap');`}</style>
       <div style={{
-        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
-        padding: '0 24px 88px',
-        textAlign: 'center',
+        minHeight: '100dvh', background: '#F2F2F7',
+        fontFamily: '"Nunito", sans-serif', paddingBottom: 88,
       }}>
-        {/* Avatar placeholder */}
+
+        {/* Top bar */}
         <div style={{
-          width: 80, height: 80, borderRadius: '50%',
-          background: '#E5E7EB', marginBottom: 20,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 36,
+          position: 'sticky', top: 0, zIndex: 40, background: '#fff',
+          borderBottom: '1px solid #F0F0F0',
+          padding: '14px 16px 12px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          👤
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
+            My Profile
+          </span>
+          <span style={{
+            fontSize: 11, fontWeight: 700,
+            background: '#FFF3EE', color: '#FF6B2B',
+            borderRadius: 20, padding: '2px 8px',
+          }}>
+            DEMO
+          </span>
         </div>
-        <h1 style={{
-          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-          fontSize: 22, color: '#111827', margin: '0 0 10px',
+
+        {/* Hero */}
+        <div style={{
+          background: '#fff', padding: '20px 16px 18px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          borderBottom: '0.5px solid #E5E7EB',
         }}>
-          Your Profile
-        </h1>
-        <p style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.6, margin: '0 0 32px', maxWidth: 300 }}>
-          Sign in to view your stats, badges, household, and account settings.
-        </p>
-        <a href="/login" style={{
-          display: 'inline-block',
-          background: '#FF6B2B', color: '#fff',
-          borderRadius: 14, padding: '14px 36px',
-          fontFamily: '"Poppins", sans-serif', fontWeight: 700,
-          fontSize: 15, textDecoration: 'none',
-          boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+          {/* Avatar */}
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: '#E6F1FB',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24, fontWeight: 600, color: '#0C447C',
+              fontFamily: '"Poppins", sans-serif',
+            }}>
+              JR
+            </div>
+            <div style={{
+              position: 'absolute', bottom: 1, right: 1, width: 22, height: 22,
+              borderRadius: '50%', background: '#EAF3DE', border: '2px solid #fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11,
+            }}>
+              ✏️
+            </div>
+          </div>
+
+          <p style={{ fontSize: 18, fontWeight: 500, color: '#111827', margin: 0, fontFamily: '"Poppins", sans-serif' }}>
+            Jordan Rivera
+          </p>
+          <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+            Sunrise Apartment · Admin
+          </p>
+
+          {/* Badges */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#FAEEDA', color: '#633806' }}>
+              🔥 14-day streak
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A' }}>
+              🏆 Top cleaner
+            </span>
+          </div>
+        </div>
+
+        {/* Stats bar */}
+        <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
+          {[
+            { num: '142', label: 'Chores done'  },
+            { num: '94%', label: 'On-time rate' },
+            { num: '870', label: 'Points'        },
+          ].map((s, i) => (
+            <div key={i} style={{
+              flex: 1, textAlign: 'center', padding: '12px 8px',
+              borderRight: i < 2 ? '0.5px solid #E5E7EB' : 'none',
+            }}>
+              <span style={{ fontSize: 18, fontWeight: 600, color: '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
+                {s.num}
+              </span>
+              <span style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginTop: 2 }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Identity */}
+        <DemoSection title="Identity">
+          <DemoRow color="purple" icon="👤" label="Display name & avatar" sub="Jordan Rivera · color: blue" />
+          <DemoRow color="purple" icon="@"  label="Username"              sub="@jordanr" />
+          <DemoRow color="purple" icon="😊" label="Personal tagline"      sub='"I always do the dishes first"' last />
+        </DemoSection>
+
+        <div style={{ height: 8, background: '#F2F2F7' }} />
+
+        {/* Stats & achievements */}
+        <DemoSection title="Stats & achievements">
+          <DemoRow color="amber" icon="🏅" label="Badges & achievements" sub="8 earned · 3 locked" />
+          <DemoRow color="amber" icon="📊" label="My chore history"      sub="Full log of completed tasks" />
+          <DemoRow color="amber" icon="⚖️" label="My fairness score"     sub="You're carrying 38% of the load" />
+          <DemoRow color="amber" icon="🎁" label="Rewards & points"      sub="870 pts · 2 rewards available" last />
+        </DemoSection>
+
+        <div style={{ height: 8, background: '#F2F2F7' }} />
+
+        {/* Preferences */}
+        <DemoSection title="Preferences">
+          <DemoRow color="teal" icon="🔔" label="Notifications"    sub="Quiet hours: 10pm – 8am" />
+          <DemoRow color="teal" icon="🌙" label="Appearance"       sub="Dark mode · System default" />
+          <DemoRow color="teal" icon="🌐" label="Language & region" sub="English · US" />
+          <DemoRow color="teal" icon="📅" label="Calendar sync"    sub="Linked to Google Calendar" last />
+        </DemoSection>
+
+        <div style={{ height: 8, background: '#F2F2F7' }} />
+
+        {/* Household */}
+        <DemoSection title="Household">
+          <DemoRow color="blue" icon="🏠" label="My households"  sub="Sunrise Apt · Mom's house" />
+          <DemoRow color="blue" icon="👥" label="Members"        sub="4 members · you're admin" />
+          <DemoRow color="blue" icon="🔗" label="Invite someone" sub="Share a link or send an email" last />
+        </DemoSection>
+
+        <div style={{ height: 8, background: '#F2F2F7' }} />
+
+        {/* Account & privacy */}
+        <DemoSection title="Account & privacy">
+          <DemoRow color="coral" icon="🔒" label="Change password" sub="Last changed 3 months ago" />
+          <DemoRow color="coral" icon="✉️" label="Email address"   sub="jordan@email.com" />
+          <DemoRow color="coral" icon="🛡️" label="Privacy & data"  sub="Export or delete your data" />
+          <DemoRow color="pink"  icon="🚪" label="Sign out" noChevron last />
+        </DemoSection>
+
+        {/* Sign in CTA */}
+        <div style={{
+          margin: '24px 16px 8px',
+          background: '#fff', borderRadius: 16,
+          padding: '20px', textAlign: 'center',
+          border: '1.5px solid #FFD5C2',
         }}>
-          Sign in
-        </a>
-        <a href="/login?tab=signup" style={{
-          display: 'inline-block', marginTop: 14,
-          color: '#FF6B2B', fontWeight: 700, fontSize: 14,
-          textDecoration: 'none', fontFamily: '"Nunito", sans-serif',
-        }}>
-          Create account →
-        </a>
+          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15, color: '#111827', fontFamily: '"Poppins", sans-serif' }}>
+            Ready to track your chores?
+          </p>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6B7280' }}>
+            Sign in to see your real stats and profile.
+          </p>
+          <a href="/login" style={{
+            display: 'inline-block',
+            background: '#FF6B2B', color: '#fff',
+            borderRadius: 12, padding: '11px 32px',
+            fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+            fontSize: 14, textDecoration: 'none',
+            boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+          }}>
+            Sign in
+          </a>
+        </div>
+
       </div>
       <BottomNav />
     </>
@@ -60,11 +251,10 @@ function ProfileGuestScreen() {
 
 export default async function ProfilePage() {
   const supabase = await createClient()
-
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Not signed in — show profile page with sign-in prompt (no redirect)
-  if (!user) return <ProfileGuestScreen />
+  // Not signed in — show demo profile
+  if (!user) return <ProfileDemoScreen />
 
   // ── 1. Profile ────────────────────────────────────────────────────────────
   const { data: profile } = await supabase
@@ -104,7 +294,6 @@ export default async function ProfilePage() {
       household:   household ?? null,
     }
 
-    // Members (for chore assignment wizard)
     const { data: memberRows } = await supabase
       .from('household_members')
       .select('user_id')
