@@ -38,6 +38,7 @@ const MEMBER_COLORS = [
 
 type Step =
   | 'welcome'
+  | 'sign-in'        // shown when not logged in and user picks Create/Join
   | 'join'
   | 'admin-name'
   | 'room-name'
@@ -95,11 +96,12 @@ function primaryBtn(disabled: boolean): React.CSSProperties {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function OnboardingClient({ displayName }: { displayName: string }) {
+export default function OnboardingClient({ displayName, isLoggedIn }: { displayName: string; isLoggedIn: boolean }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [step, setStep] = useState<Step>('welcome')
   const [error, setError] = useState<string | null>(null)
+  const [pendingPath, setPendingPath] = useState<'create' | 'join'>('create')
 
   // Admin info
   const [adminName, setAdminName] = useState(displayName === 'there' ? '' : displayName)
@@ -391,7 +393,11 @@ export default function OnboardingClient({ displayName }: { displayName: string 
                 {/* Create Room */}
                 <button
                   type="button"
-                  onClick={() => { clearError(); setStep('admin-name') }}
+                  onClick={() => {
+                    clearError()
+                    if (!isLoggedIn) { setPendingPath('create'); setStep('sign-in') }
+                    else setStep('admin-name')
+                  }}
                   style={{
                     background: '#FF6B2B', border: 'none', borderRadius: 18,
                     padding: '22px 20px', cursor: 'pointer', textAlign: 'left',
@@ -413,7 +419,11 @@ export default function OnboardingClient({ displayName }: { displayName: string 
                 {/* Join Room */}
                 <button
                   type="button"
-                  onClick={() => { clearError(); setStep('join') }}
+                  onClick={() => {
+                    clearError()
+                    if (!isLoggedIn) { setPendingPath('join'); setStep('sign-in') }
+                    else setStep('join')
+                  }}
                   style={{
                     background: '#fff', border: '2px solid #E5E7EB',
                     borderRadius: 18, padding: '22px 20px',
@@ -432,6 +442,57 @@ export default function OnboardingClient({ displayName }: { displayName: string 
                   </p>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── SIGN IN (shown when not logged in) ──────────────────────────── */}
+          {step === 'sign-in' && (
+            <div>
+              <BackBtn onClick={() => { clearError(); setStep('welcome') }} />
+              <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>
+                  {pendingPath === 'create' ? '🏡' : '🔑'}
+                </div>
+                <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 8px' }}>
+                  {pendingPath === 'create' ? 'Create your room' : 'Join a room'}
+                </h2>
+                <p style={{ fontSize: 14, color: '#6B7280', margin: 0, lineHeight: 1.6 }}>
+                  Sign in or create an account to continue.<br />It only takes a minute.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <a
+                  href={`/login?tab=signup&redirectTo=/onboarding`}
+                  style={{
+                    display: 'block', textAlign: 'center',
+                    background: '#FF6B2B', color: '#fff',
+                    borderRadius: 14, padding: '14px',
+                    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 14px rgba(255,107,43,0.3)',
+                  }}
+                >
+                  Create account →
+                </a>
+                <a
+                  href={`/login?redirectTo=/onboarding`}
+                  style={{
+                    display: 'block', textAlign: 'center',
+                    background: '#fff', color: '#374151',
+                    borderRadius: 14, padding: '13px',
+                    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15,
+                    textDecoration: 'none',
+                    border: '2px solid #E5E7EB',
+                  }}
+                >
+                  Sign in to existing account
+                </a>
+              </div>
+
+              <p style={{ textAlign: 'center', fontSize: 12, color: '#9CA3AF', margin: '20px 0 0' }}>
+                Your progress is saved — you'll return right here after signing in.
+              </p>
             </div>
           )}
 

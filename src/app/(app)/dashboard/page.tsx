@@ -26,27 +26,8 @@ export default async function DashboardPage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Auth guard temporarily disabled — uncomment to re-enable login requirement
-  // if (!user) redirect('/login')
-
-  // If no session, render a blank dashboard shell so the app is still navigable
-  if (!user) {
-    return (
-      <DashboardClient
-        currentUser={{ id: 'guest', full_name: 'Guest', avatar_url: null, email: '' } as UserRow}
-        myOverdueChores={[]}
-        myTodayChores={[]}
-        householdName="My Household"
-        householdId=""
-        colorMap={{}}
-        myStreak={null}
-        pinnedAnnouncements={[]}
-        recentActivity={[]}
-        allHouseholds={[]}
-        householdAllChores={[]}
-      />
-    )
-  }
+  // Not signed in → start onboarding flow
+  if (!user) redirect('/onboarding')
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([

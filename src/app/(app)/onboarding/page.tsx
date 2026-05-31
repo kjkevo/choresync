@@ -19,7 +19,7 @@ export default async function OnboardingPage() {
     user?.user_metadata?.full_name ??
     user?.user_metadata?.name ??
     user?.email?.split('@')[0] ??
-    'there'
+    ''
 
-  return <OnboardingClient displayName={displayName} />
+  return <OnboardingClient displayName={displayName} isLoggedIn={!!user} />
 }
