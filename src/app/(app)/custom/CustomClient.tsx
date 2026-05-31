@@ -71,11 +71,13 @@ interface CustomClientProps {
   householdId:   string
   members:       UserRow[]
   currentUserId: string
+  /** When true: no page shell, no header, no BottomNav — renders inline */
+  embedded?:     boolean
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CustomClient({ householdId, members, currentUserId }: CustomClientProps) {
+export default function CustomClient({ householdId, members, currentUserId, embedded = false }: CustomClientProps) {
   const [step,             setStep]           = useState(1)
   const [selectedTemplate, setSelectedTemplate] = useState<number | 'custom' | null>(null)
   const [choreName,        setChoreName]      = useState('')
@@ -159,7 +161,7 @@ export default function CustomClient({ householdId, members, currentUserId }: Cu
     const result = await createChore(fd)
     setSubmitting(false)
 
-    if (result?.error) {
+    if (result && 'error' in result && result.error) {
       setError(result.error)
     } else {
       setSuccess(true)
@@ -169,6 +171,22 @@ export default function CustomClient({ householdId, members, currentUserId }: Cu
   // ── Success state ──────────────────────────────────────────────────────────
 
   if (success) {
+    if (embedded) {
+      return (
+        <div style={{ padding: '32px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 52, marginBottom: 12 }}>🎉</div>
+          <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 22, color: '#111827', margin: '0 0 8px' }}>Chore created!</h2>
+          <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px' }}>Your household chore is ready to go.</p>
+          <button
+            type="button"
+            onClick={() => { setSuccess(false); setStep(1); setSelectedTemplate(null); setChoreName(''); setPoints(10); setDueDate(''); setFrequency('one-time'); setDescription(''); setAssignedTo(null); setRotateEnabled(false); setJudgment('self') }}
+            style={{ background: '#FF6B2B', color: '#fff', border: 'none', borderRadius: 14, padding: '13px 32px', fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+          >
+            Create another
+          </button>
+        </div>
+      )
+    }
     return (
       <>
         <style>{FONTS}</style>
@@ -218,12 +236,18 @@ export default function CustomClient({ householdId, members, currentUserId }: Cu
 
   return (
     <>
-      <style>{FONTS}</style>
-      <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: '"Nunito", sans-serif', paddingBottom: 80 }}>
-        <Header />
+      {!embedded && <style>{FONTS}</style>}
+      <div style={embedded
+        ? { fontFamily: '"Nunito", sans-serif' }
+        : { minHeight: '100vh', background: '#F7F8FA', fontFamily: '"Nunito", sans-serif', paddingBottom: 80 }
+      }>
+        {!embedded && <Header />}
 
         {/* Progress bar */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', padding: '12px 16px' }}>
+        <div style={embedded
+          ? { background: '#F3F4F6', borderRadius: 14, padding: '12px 4px 14px', marginBottom: 16 }
+          : { background: '#fff', borderBottom: '1px solid #F0F0F0', padding: '12px 16px' }
+        }>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               {['Template', 'Configure', 'Assign', 'Judgment'].map((label, i) => (
@@ -256,7 +280,10 @@ export default function CustomClient({ householdId, members, currentUserId }: Cu
           </div>
         </div>
 
-        <main style={{ maxWidth: 500, margin: '0 auto', padding: '20px 16px 0' }}>
+        <main style={embedded
+          ? { padding: '0 0 16px' }
+          : { maxWidth: 500, margin: '0 auto', padding: '20px 16px 0' }
+        }>
 
           {/* ── Step 1: Template ──────────────────────────────────────────── */}
           {step === 1 && (
@@ -676,7 +703,7 @@ export default function CustomClient({ householdId, members, currentUserId }: Cu
           )}
         </main>
 
-        <BottomNav />
+        {!embedded && <BottomNav />}
       </div>
     </>
   )

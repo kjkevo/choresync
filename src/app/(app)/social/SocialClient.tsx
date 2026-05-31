@@ -9,6 +9,7 @@ import { sendMessage, deleteMessage, toggleReaction } from '@/lib/actions/messag
 import {
   createAnnouncement, toggleAnnouncementPin, deleteAnnouncement,
 } from '@/lib/actions/announcements'
+import BottomNav from '@/components/ui/BottomNav'
 import type {
   UserRow, MessageWithMeta, MessageReactionRow,
   AnnouncementWithAuthor, MessageEmoji,
@@ -17,14 +18,7 @@ import type {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMOJIS: MessageEmoji[] = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
-
-const NAV_ITEMS = [
-  { href: '/dashboard',   label: 'Dashboard' },
-  { href: '/leaderboard', label: 'Rankings'  },
-  { href: '/custom',      label: 'Custom'    },
-  { href: '/social',      label: '💬', active: true },
-  { href: '/profile',     label: 'Profile'   },
-]
+const ORANGE = '#FF6B2B'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,15 +32,12 @@ function formatTime(iso: string) {
   const now = new Date()
   const diffMs = now.getTime() - d.getTime()
   const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffDays === 0) {
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }
-  if (diffDays === 1) {
-    return `Yesterday ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-  }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+  if (diffDays === 0) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  if (diffDays === 1) return `Yesterday ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  return (
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
     ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  )
 }
 
 function isGrouped(msgs: MessageWithMeta[], idx: number) {
@@ -55,6 +46,43 @@ function isGrouped(msgs: MessageWithMeta[], idx: number) {
   const curr = msgs[idx]
   if (prev.user_id !== curr.user_id) return false
   return new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60_000
+}
+
+// ── Avatar component ──────────────────────────────────────────────────────────
+
+function AvatarCircle({
+  avatarUrl, name, color, size = 32,
+}: {
+  avatarUrl: string | null | undefined
+  name:      string | null | undefined
+  color:     string
+  size?:     number
+}) {
+  const isEmoji = avatarUrl?.startsWith('emoji:')
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: color,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, overflow: 'hidden',
+      fontSize: isEmoji ? size * 0.55 : size * 0.36,
+      fontWeight: 700, color: '#fff',
+    }}>
+      {isEmoji ? (
+        <span>{avatarUrl!.slice(6)}</span>
+      ) : avatarUrl ? (
+        <Image
+          src={avatarUrl}
+          alt={name ?? ''}
+          width={size}
+          height={size}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          unoptimized
+        />
+      ) : (
+        <span>{initials(name ?? null)}</span>
+      )}
+    </div>
+  )
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -87,7 +115,7 @@ export default function SocialClient({
   householdName,
   isAdmin,
   initialMessages,
-  announcements:  initialAnnouncements,
+  announcements: initialAnnouncements,
   members,
   colorMap,
 }: SocialClientProps) {
@@ -99,55 +127,69 @@ export default function SocialClient({
   )
 
   return (
-    <div className="flex h-dvh flex-col" style={{ background: 'var(--cs-bg)' }}>
-      {/* Nav */}
-      <header className="flex-shrink-0 app-header">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold" style={{ color: 'var(--cs-muted)' }}>{householdName}</span>
-          <nav className="flex items-center gap-1 overflow-x-auto">
-            {NAV_ITEMS.map(({ href, label, active }) => (
-              <a key={href} href={href} className={`nav-link${active ? ' active' : ''}`}>
-                {label}
-              </a>
-            ))}
-          </nav>
+    <>
+      <div style={{
+        height: '100dvh', display: 'flex', flexDirection: 'column',
+        background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
+      }}>
+        {/* Header */}
+        <header style={{
+          flexShrink: 0, background: '#fff',
+          boxShadow: '0 1px 0 #E5E7EB',
+        }}>
+          <div style={{ padding: '14px 20px 0', maxWidth: 640, margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 22 }}>💬</span>
+              <span style={{
+                fontFamily: '"Poppins", sans-serif', fontWeight: 700,
+                fontSize: 17, color: '#111827',
+              }}>
+                {householdName}
+              </span>
+            </div>
+          </div>
+
+          {/* Tab strip */}
+          <div style={{ display: 'flex', maxWidth: 640, margin: '12px auto 0' }}>
+            <TabBtn active={tab === 'chat'} onClick={() => setTab('chat')}>
+              💬 Chat
+            </TabBtn>
+            <TabBtn active={tab === 'announcements'} onClick={() => setTab('announcements')}>
+              📌 Announcements
+            </TabBtn>
+          </div>
+        </header>
+
+        {/* Body */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {tab === 'chat' ? (
+            <ChatTab
+              householdId={householdId}
+              currentUserId={currentUserId}
+              currentUser={currentUser}
+              initialMessages={initialMessages}
+              memberById={memberById}
+              colorMap={colorMap}
+              isAdmin={isAdmin}
+            />
+          ) : (
+            <AnnouncementsTab
+              householdId={householdId}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              initialAnnouncements={initialAnnouncements}
+              memberById={memberById}
+              colorMap={colorMap}
+            />
+          )}
         </div>
 
-        {/* Tab strip */}
-        <div className="mx-auto flex max-w-2xl border-t border-slate-100">
-          <TabButton active={tab === 'chat'} onClick={() => setTab('chat')}>
-            💬 Chat
-          </TabButton>
-          <TabButton active={tab === 'announcements'} onClick={() => setTab('announcements')}>
-            📌 Announcements
-          </TabButton>
-        </div>
-      </header>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {tab === 'chat' ? (
-          <ChatTab
-            householdId={householdId}
-            currentUserId={currentUserId}
-            currentUser={currentUser}
-            initialMessages={initialMessages}
-            memberById={memberById}
-            colorMap={colorMap}
-            isAdmin={isAdmin}
-          />
-        ) : (
-          <AnnouncementsTab
-            householdId={householdId}
-            currentUserId={currentUserId}
-            isAdmin={isAdmin}
-            initialAnnouncements={initialAnnouncements}
-            memberById={memberById}
-            colorMap={colorMap}
-          />
-        )}
+        {/* Spacer for fixed BottomNav */}
+        <div style={{ height: 68, flexShrink: 0 }} />
       </div>
-    </div>
+
+      <BottomNav />
+    </>
   )
 }
 
@@ -165,16 +207,16 @@ function ChatTab({
   colorMap:        Record<string, string>
   isAdmin:         boolean
 }) {
-  const [messages, setMessages]   = useState<MessageWithMeta[]>(initialMessages)
-  const [input,    setInput]      = useState('')
-  const [sending,  startSend]     = useTransition()
-  const [emojiFor, setEmojiFor]   = useState<string | null>(null)   // message id showing picker
-  const [deleteFor, setDeleteFor] = useState<string | null>(null)   // message id awaiting confirm
+  const [messages,    setMessages]    = useState<MessageWithMeta[]>(initialMessages)
+  const [input,       setInput]       = useState('')
+  const [sending,     startSend]      = useTransition()
+  const [emojiFor,    setEmojiFor]    = useState<string | null>(null)
+  const [deleteFor,   setDeleteFor]   = useState<string | null>(null)
+  const [hoveredMsg,  setHoveredMsg]  = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
   const supabase  = useRef(createClient())
 
-  // Scroll to bottom
   const scrollToBottom = useCallback((smooth = false) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
   }, [])
@@ -192,12 +234,9 @@ function ChatTab({
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `household_id=eq.${householdId}` },
         (payload) => {
           const newMsg = payload.new as MessageWithMeta
-          // Skip if we already have this message (optimistic insert)
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev
             const member = memberById[newMsg.user_id] ?? null
-            // Cast member to UserRow | null — real-time payloads only have
-            // the subset of fields we need; the author type is widened here.
             return [...prev, { ...newMsg, author: member as unknown as UserRow | null, reactions: [] }]
           })
           setTimeout(() => scrollToBottom(true), 50)
@@ -244,13 +283,12 @@ function ChatTab({
     return () => { sb.removeChannel(channel) }
   }, [householdId, memberById, scrollToBottom])
 
-  // Send message
+  // Send
   async function handleSend() {
     const text = input.trim()
     if (!text || sending) return
     setInput('')
 
-    // Optimistic insert
     const optimisticId = `opt-${Date.now()}`
     const optimistic: MessageWithMeta = {
       id:           optimisticId,
@@ -268,10 +306,8 @@ function ChatTab({
     startSend(async () => {
       const result = await sendMessage(householdId, text)
       if (result.error) {
-        // Revert optimistic
         setMessages(prev => prev.filter(m => m.id !== optimisticId))
       } else if (result.message) {
-        // Replace optimistic with real row
         setMessages(prev => prev.map(m =>
           m.id === optimisticId
             ? { ...result.message!, author: currentUser as unknown as UserRow, reactions: [] }
@@ -288,31 +324,27 @@ function ChatTab({
     }
   }
 
-  // Toggle emoji reaction (optimistic)
   async function handleReaction(messageId: string, emoji: MessageEmoji) {
     setEmojiFor(null)
     const alreadyReacted = messages
       .find(m => m.id === messageId)
       ?.reactions.some(r => r.user_id === currentUserId && r.emoji === emoji)
 
-    // Optimistic update
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
       if (alreadyReacted) {
         return { ...m, reactions: m.reactions.filter(r => !(r.user_id === currentUserId && r.emoji === emoji)) }
-      } else {
-        const fake: MessageReactionRow = {
-          id: `opt-${Date.now()}`, message_id: messageId,
-          user_id: currentUserId, emoji, created_at: new Date().toISOString(),
-        }
-        return { ...m, reactions: [...m.reactions, fake] }
       }
+      const fake: MessageReactionRow = {
+        id: `opt-${Date.now()}`, message_id: messageId,
+        user_id: currentUserId, emoji, created_at: new Date().toISOString(),
+      }
+      return { ...m, reactions: [...m.reactions, fake] }
     }))
 
     await toggleReaction(messageId, emoji)
   }
 
-  // Delete message
   async function handleDelete(messageId: string) {
     setDeleteFor(null)
     setMessages(prev => prev.filter(m => m.id !== messageId))
@@ -321,25 +353,33 @@ function ChatTab({
 
   return (
     <>
-      {/* Messages scroll area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      {/* Scroll area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px' }}>
+
         {messages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-4xl">💬</p>
-            <p className="mt-3 font-semibold text-slate-600">No messages yet</p>
-            <p className="mt-1 text-sm text-slate-400">Be the first to say hello!</p>
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', height: '100%', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 48 }}>💬</div>
+            <p style={{ marginTop: 12, fontWeight: 700, color: '#374151', fontSize: 16 }}>
+              No messages yet
+            </p>
+            <p style={{ marginTop: 4, fontSize: 13, color: '#9CA3AF' }}>
+              Be the first to say hello!
+            </p>
           </div>
         )}
 
-        <div className="mx-auto max-w-2xl space-y-1">
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
           {messages.map((msg, idx) => {
-            const grouped  = isGrouped(messages, idx)
-            const isMe     = msg.user_id === currentUserId
-            const color    = colorMap[msg.user_id] ?? '#6366f1'
-            const member   = memberById[msg.user_id]
+            const grouped   = isGrouped(messages, idx)
+            const isMe      = msg.user_id === currentUserId
+            const color     = colorMap[msg.user_id] ?? '#6366f1'
+            const member    = memberById[msg.user_id]
             const canDelete = isMe || isAdmin
+            const hovered   = hoveredMsg === msg.id
 
-            // Group reactions by emoji
             const reactionGroups: Record<string, { count: number; iMine: boolean }> = {}
             for (const r of msg.reactions) {
               if (!reactionGroups[r.emoji]) reactionGroups[r.emoji] = { count: 0, iMine: false }
@@ -350,57 +390,67 @@ function ChatTab({
             return (
               <div
                 key={msg.id}
-                className={`group flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} ${grouped ? 'mt-0.5' : 'mt-4'}`}
+                style={{
+                  display: 'flex', gap: 8, alignItems: 'flex-end',
+                  flexDirection: isMe ? 'row-reverse' : 'row',
+                  marginTop: grouped ? 2 : 16,
+                }}
+                onMouseEnter={() => setHoveredMsg(msg.id)}
+                onMouseLeave={() => setHoveredMsg(null)}
               >
-                {/* Avatar */}
-                <div className={`flex-shrink-0 ${grouped ? 'w-8 opacity-0' : 'w-8'}`}>
+                {/* Avatar column */}
+                <div style={{ width: 32, flexShrink: 0, opacity: grouped ? 0 : 1 }}>
                   {!grouped && (
-                    <div
-                      className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
-                      style={{ background: color }}
-                    >
-                      {member?.avatarUrl ? (
-                        <Image src={member.avatarUrl} alt={member.name ?? ''} width={32} height={32} className="h-full w-full object-cover" unoptimized />
-                      ) : (
-                        initials(member?.name ?? null)
-                      )}
-                    </div>
+                    <AvatarCircle
+                      avatarUrl={member?.avatarUrl}
+                      name={member?.name}
+                      color={color}
+                      size={32}
+                    />
                   )}
                 </div>
 
                 {/* Bubble + meta */}
-                <div className={`flex max-w-[75%] flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
+                <div style={{
+                  maxWidth: '72%', display: 'flex', flexDirection: 'column', gap: 3,
+                  alignItems: isMe ? 'flex-end' : 'flex-start',
+                }}>
+                  {/* Name + time */}
                   {!grouped && (
-                    <div className={`flex items-baseline gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <span className="text-xs font-semibold" style={{ color }}>
+                    <div style={{
+                      display: 'flex', gap: 6, alignItems: 'baseline',
+                      flexDirection: isMe ? 'row-reverse' : 'row',
+                    }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color }}>
                         {isMe ? 'You' : (member?.name ?? 'Unknown')}
                       </span>
-                      <span className="text-[10px] text-slate-400">{formatTime(msg.created_at)}</span>
+                      <span style={{ fontSize: 10, color: '#9CA3AF' }}>
+                        {formatTime(msg.created_at)}
+                      </span>
                     </div>
                   )}
 
-                  <div className="relative">
-                    <div
-                      className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm
-                        ${isMe
-                          ? 'rounded-tr-sm text-white'
-                          : 'rounded-tl-sm bg-white text-slate-800 border border-slate-100'
-                        }
-                        ${msg.id.startsWith('opt-') ? 'opacity-70' : ''}
-                      `}
-                      style={isMe ? { background: color } : undefined}
-                    >
-                      {msg.content}
-                    </div>
-
-                    {/* Action buttons (visible on group-hover) */}
-                    <div className={`absolute top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity
-                      ${isMe ? 'right-full mr-2' : 'left-full ml-2'}`}
-                    >
+                  {/* Bubble row with action buttons */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    flexDirection: isMe ? 'row' : 'row-reverse',
+                  }}>
+                    {/* Action buttons */}
+                    <div style={{
+                      display: 'flex', gap: 4,
+                      opacity: hovered ? 1 : 0,
+                      transition: 'opacity 0.15s',
+                    }}>
                       <button
                         type="button"
                         onClick={() => setEmojiFor(emojiFor === msg.id ? null : msg.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white border border-slate-200 text-sm shadow-sm hover:bg-slate-50"
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: '#fff', border: '1.5px solid #E5E7EB',
+                          cursor: 'pointer', fontSize: 14,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        }}
                         title="React"
                       >
                         😊
@@ -409,37 +459,68 @@ function ChatTab({
                         <button
                           type="button"
                           onClick={() => setDeleteFor(msg.id)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm hover:bg-red-50 hover:border-red-200"
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: '#fff', border: '1.5px solid #E5E7EB',
+                            cursor: 'pointer', color: '#9CA3AF',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          }}
                           title="Delete"
                         >
-                          <TrashIcon className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" />
+                          <TrashIcon size={13} />
                         </button>
                       )}
                     </div>
 
-                    {/* Emoji picker popover */}
-                    {emojiFor === msg.id && (
-                      <EmojiPicker
-                        onPick={(emoji) => handleReaction(msg.id, emoji)}
-                        onClose={() => setEmojiFor(null)}
-                        isMe={isMe}
-                      />
-                    )}
+                    {/* Bubble */}
+                    <div style={{ position: 'relative' }}>
+                      <div style={{
+                        background: isMe ? ORANGE : '#fff',
+                        color: isMe ? '#fff' : '#111827',
+                        borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                        padding: '9px 14px',
+                        fontSize: 14, lineHeight: 1.5,
+                        boxShadow: isMe
+                          ? '0 2px 10px rgba(255,107,43,0.25)'
+                          : '0 1px 4px rgba(0,0,0,0.08)',
+                        opacity: msg.id.startsWith('opt-') ? 0.65 : 1,
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}>
+                        {msg.content}
+                      </div>
+
+                      {/* Emoji picker */}
+                      {emojiFor === msg.id && (
+                        <EmojiPicker
+                          onPick={emoji => handleReaction(msg.id, emoji)}
+                          onClose={() => setEmojiFor(null)}
+                          isMe={isMe}
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Reaction pills */}
                   {Object.keys(reactionGroups).length > 0 && (
-                    <div className={`flex flex-wrap gap-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <div style={{
+                      display: 'flex', flexWrap: 'wrap', gap: 4,
+                      justifyContent: isMe ? 'flex-end' : 'flex-start',
+                    }}>
                       {Object.entries(reactionGroups).map(([emoji, { count, iMine }]) => (
                         <button
                           key={emoji}
                           type="button"
                           onClick={() => handleReaction(msg.id, emoji as MessageEmoji)}
-                          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold transition
-                            ${iMine
-                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                            }`}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            borderRadius: 20,
+                            border: `1.5px solid ${iMine ? ORANGE : '#E5E7EB'}`,
+                            background: iMine ? '#FFF3EE' : '#fff',
+                            color: iMine ? ORANGE : '#6B7280',
+                            padding: '2px 8px', fontSize: 12, fontWeight: 800,
+                            cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                          }}
                         >
                           {emoji} {count}
                         </button>
@@ -450,23 +531,27 @@ function ChatTab({
               </div>
             )
           })}
-          <div ref={bottomRef} className="h-1" />
+
+          <div ref={bottomRef} style={{ height: 4 }} />
         </div>
       </div>
 
       {/* Input bar */}
-      <div className="flex-shrink-0 border-t border-slate-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-2xl items-end gap-2">
-          <div
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
-            style={{ background: colorMap[currentUserId] ?? '#6366f1' }}
-          >
-            {currentUser.avatar_url ? (
-              <Image src={currentUser.avatar_url} alt={currentUser.full_name ?? ''} width={32} height={32} className="h-full w-full object-cover" unoptimized />
-            ) : (
-              initials(currentUser.full_name)
-            )}
-          </div>
+      <div style={{
+        flexShrink: 0, borderTop: '1px solid #E5E7EB',
+        background: '#fff', padding: '10px 16px 12px',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: 10,
+          maxWidth: 640, margin: '0 auto',
+        }}>
+          <AvatarCircle
+            avatarUrl={currentUser.avatar_url}
+            name={currentUser.full_name}
+            color={colorMap[currentUserId] ?? '#6366f1'}
+            size={32}
+          />
+
           <textarea
             ref={inputRef}
             value={input}
@@ -474,14 +559,36 @@ function ChatTab({
             onKeyDown={handleKeyDown}
             placeholder="Message the household…"
             rows={1}
-            className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            style={{ maxHeight: '120px', overflowY: 'auto' }}
+            style={{
+              flex: 1, resize: 'none',
+              borderRadius: 20,
+              border: '1.5px solid #E5E7EB',
+              background: '#F7F8FA',
+              padding: '9px 16px',
+              fontSize: 14, color: '#111827',
+              fontFamily: '"Nunito", sans-serif',
+              outline: 'none',
+              maxHeight: 120, overflowY: 'auto',
+              lineHeight: 1.5,
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = ORANGE }}
+            onBlur={e => { e.currentTarget.style.borderColor = '#E5E7EB' }}
           />
+
           <button
             type="button"
             onClick={handleSend}
             disabled={!input.trim() || sending}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-40 active:scale-95"
+            style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: (input.trim() && !sending) ? ORANGE : '#E5E7EB',
+              color: (input.trim() && !sending) ? '#fff' : '#9CA3AF',
+              border: 'none',
+              cursor: (input.trim() && !sending) ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, transition: 'all 0.15s',
+              boxShadow: (input.trim() && !sending) ? '0 3px 10px rgba(255,107,43,0.35)' : 'none',
+            }}
             aria-label="Send"
           >
             <SendIcon />
@@ -489,7 +596,6 @@ function ChatTab({
         </div>
       </div>
 
-      {/* Delete confirm dialog */}
       {deleteFor && (
         <ConfirmDialog
           message="Delete this message?"
@@ -498,9 +604,8 @@ function ChatTab({
         />
       )}
 
-      {/* Close emoji picker on outside click */}
       {emojiFor && (
-        <div className="fixed inset-0 z-10" onClick={() => setEmojiFor(null)} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setEmojiFor(null)} />
       )}
     </>
   )
@@ -527,7 +632,6 @@ function AnnouncementsTab({
   const [deleteFor,  setDeleteFor]  = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
-  // Real-time announcements
   const supabaseRef = useRef(createClient())
   useEffect(() => {
     const sb = supabaseRef.current
@@ -536,10 +640,7 @@ function AnnouncementsTab({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'announcements', filter: `household_id=eq.${householdId}` },
-        () => {
-          // Full refresh on any announcement change (they're infrequent)
-          window.location.reload()
-        },
+        () => { window.location.reload() },
       )
       .subscribe()
     return () => { sb.removeChannel(channel) }
@@ -561,10 +662,12 @@ function AnnouncementsTab({
             created_at: '',
           } as UserRow : null,
         }
-        setAnnouncements(prev => [newAnn, ...prev].sort((a, b) =>
-          (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ))
+        setAnnouncements(prev =>
+          [newAnn, ...prev].sort((a, b) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          )
+        )
         setDraftText('')
         setPinDraft(false)
         setComposing(false)
@@ -577,11 +680,12 @@ function AnnouncementsTab({
     const result = await toggleAnnouncementPin(id)
     if (!result.error) {
       setAnnouncements(prev =>
-        prev.map(a => a.id === id ? { ...a, is_pinned: result.is_pinned! } : a)
-            .sort((a, b) =>
-              (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )
+        prev
+          .map(a => a.id === id ? { ...a, is_pinned: result.is_pinned! } : a)
+          .sort((a, b) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          )
       )
     }
     setTogglingId(null)
@@ -597,24 +701,34 @@ function AnnouncementsTab({
   const unpinned = announcements.filter(a => !a.is_pinned)
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto max-w-2xl space-y-4">
+    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 24px' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Compose (admin only) */}
           {isAdmin && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div style={{
+              borderRadius: 16, border: '1.5px solid #E5E7EB',
+              background: '#fff', overflow: 'hidden',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            }}>
               {!composing ? (
                 <button
                   type="button"
                   onClick={() => setComposing(true)}
-                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm text-slate-400 hover:bg-slate-50 transition"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    width: '100%', padding: '14px 16px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    textAlign: 'left', fontSize: 14, color: '#9CA3AF',
+                    fontFamily: '"Nunito", sans-serif',
+                  }}
                 >
-                  <span className="text-xl">📣</span>
+                  <span style={{ fontSize: 22 }}>📣</span>
                   <span>Post an announcement…</span>
                 </button>
               ) : (
-                <div className="p-4 space-y-3">
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <textarea
                     autoFocus
                     value={draftText}
@@ -622,25 +736,45 @@ function AnnouncementsTab({
                     placeholder="Write your announcement…"
                     rows={3}
                     maxLength={1000}
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    style={{
+                      width: '100%', resize: 'none', borderRadius: 12,
+                      border: '1.5px solid #E5E7EB', background: '#F7F8FA',
+                      padding: '10px 14px', fontSize: 14, color: '#111827',
+                      fontFamily: '"Nunito", sans-serif', outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
                   />
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    {/* Pin toggle */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
                       <div
                         onClick={() => setPinDraft(p => !p)}
-                        className={`relative h-5 w-9 cursor-pointer rounded-full transition ${pinDraft ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                        style={{
+                          position: 'relative', width: 36, height: 20,
+                          borderRadius: 10, background: pinDraft ? ORANGE : '#D1D5DB',
+                          cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+                        }}
                       >
-                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${pinDraft ? 'left-4' : 'left-0.5'}`} />
+                        <div style={{
+                          position: 'absolute', top: 2,
+                          left: pinDraft ? 18 : 2,
+                          width: 16, height: 16, borderRadius: '50%',
+                          background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          transition: 'left 0.2s',
+                        }} />
                       </div>
-                      <span className="flex items-center gap-1">
-                        <span>📌</span> Pin to dashboard
-                      </span>
+                      <span>📌 Pin to dashboard</span>
                     </label>
-                    <div className="flex gap-2">
+
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         type="button"
                         onClick={() => { setComposing(false); setDraftText(''); setPinDraft(false) }}
-                        className="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 transition"
+                        style={{
+                          padding: '7px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB',
+                          background: '#fff', fontSize: 13, fontWeight: 700, color: '#6B7280',
+                          cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                        }}
                       >
                         Cancel
                       </button>
@@ -648,7 +782,13 @@ function AnnouncementsTab({
                         type="button"
                         onClick={handleCreate}
                         disabled={!draftText.trim() || saving}
-                        className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition"
+                        style={{
+                          padding: '7px 18px', borderRadius: 10, border: 'none',
+                          background: draftText.trim() && !saving ? ORANGE : '#E5E7EB',
+                          color: draftText.trim() && !saving ? '#fff' : '#9CA3AF',
+                          fontSize: 13, fontWeight: 700, cursor: draftText.trim() && !saving ? 'pointer' : 'default',
+                          fontFamily: '"Nunito", sans-serif',
+                        }}
                       >
                         {saving ? 'Posting…' : 'Post'}
                       </button>
@@ -659,11 +799,13 @@ function AnnouncementsTab({
             </div>
           )}
 
-          {/* Pinned section */}
+          {/* Pinned */}
           {pinned.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">📌 Pinned</p>
-              <div className="space-y-3">
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                📌 Pinned
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {pinned.map(a => (
                   <AnnouncementCard
                     key={a.id}
@@ -679,13 +821,15 @@ function AnnouncementsTab({
             </div>
           )}
 
-          {/* All announcements */}
+          {/* All */}
           {unpinned.length > 0 && (
             <div>
               {pinned.length > 0 && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">All</p>
+                <p style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  All
+                </p>
               )}
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {unpinned.map(a => (
                   <AnnouncementCard
                     key={a.id}
@@ -702,12 +846,18 @@ function AnnouncementsTab({
           )}
 
           {announcements.length === 0 && !composing && (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
-              <p className="text-3xl">📌</p>
-              <p className="mt-3 font-semibold text-slate-600">No announcements yet</p>
+            <div style={{
+              borderRadius: 16, border: '2px dashed #E5E7EB',
+              background: '#fff', padding: '56px 24px',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 40 }}>📌</div>
+              <p style={{ marginTop: 12, fontWeight: 700, color: '#374151', fontSize: 15 }}>
+                No announcements yet
+              </p>
               {isAdmin && (
-                <p className="mt-1 text-sm text-slate-400">
-                  Post important messages above to keep the household informed.
+                <p style={{ marginTop: 4, fontSize: 13, color: '#9CA3AF' }}>
+                  Post important messages to keep the household informed.
                 </p>
               )}
             </div>
@@ -738,53 +888,72 @@ function AnnouncementCard({
   onDelete:     () => void
   colorMap:     Record<string, string>
 }) {
-  const color     = colorMap[announcement.created_by] ?? '#6366f1'
-  const isPinned  = announcement.is_pinned
+  const color    = colorMap[announcement.created_by] ?? '#6366f1'
+  const isPinned = announcement.is_pinned
 
   return (
-    <div className={`overflow-hidden rounded-2xl border bg-white shadow-sm
-      ${isPinned ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-200'}`}>
+    <div style={{
+      borderRadius: 16,
+      border: `1.5px solid ${isPinned ? '#FFD5C2' : '#E5E7EB'}`,
+      background: isPinned ? '#FFFAF7' : '#fff',
+      overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    }}>
       {isPinned && (
-        <div className="bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white">
+        <div style={{
+          background: ORANGE, padding: '6px 16px',
+          fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.03em',
+        }}>
           📌 Pinned announcement
         </div>
       )}
-      <div className="p-4">
-        <p className="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">{announcement.content}</p>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <div
-              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white"
-              style={{ background: color }}
-            >
+      <div style={{ padding: '14px 16px' }}>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: '#111827', whiteSpace: 'pre-wrap' }}>
+          {announcement.content}
+        </p>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: color, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, fontWeight: 700, color: '#fff',
+            }}>
               {initials(announcement.author?.full_name ?? null)}
             </div>
-            <span className="text-xs text-slate-400">
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>
               {announcement.author?.full_name ?? 'Admin'} · {formatTime(announcement.created_at)}
             </span>
           </div>
+
           {isAdmin && (
-            <div className="flex items-center gap-1">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button
                 type="button"
                 onClick={onTogglePin}
                 disabled={toggling}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50
-                  ${isPinned
-                    ? 'text-indigo-600 hover:bg-indigo-50'
-                    : 'text-slate-500 hover:bg-slate-100'
-                  }`}
-                title={isPinned ? 'Unpin' : 'Pin to dashboard'}
+                style={{
+                  padding: '4px 10px', borderRadius: 8, border: 'none',
+                  background: isPinned ? '#FFF3EE' : '#F3F4F6',
+                  color: isPinned ? ORANGE : '#6B7280',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: '"Nunito", sans-serif',
+                  opacity: toggling ? 0.5 : 1,
+                }}
               >
                 {isPinned ? 'Unpin' : '📌 Pin'}
               </button>
               <button
                 type="button"
                 onClick={onDelete}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
-                title="Delete"
+                style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  border: 'none', background: 'none',
+                  color: '#9CA3AF', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
               >
-                <TrashIcon className="h-3.5 w-3.5" />
+                <TrashIcon size={14} />
               </button>
             </div>
           )}
@@ -802,14 +971,28 @@ function EmojiPicker({ onPick, onClose, isMe }: {
   isMe:    boolean
 }) {
   return (
-    <div className={`absolute z-20 flex gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl
-      top-0 ${isMe ? 'right-full mr-10' : 'left-full ml-10'}`}>
+    <div style={{
+      position: 'absolute', zIndex: 20,
+      display: 'flex', gap: 4,
+      borderRadius: 20, border: '1.5px solid #E5E7EB',
+      background: '#fff', padding: '6px 8px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+      top: -44,
+      ...(isMe ? { right: 0 } : { left: 0 }),
+    }}>
       {EMOJIS.map(e => (
         <button
           key={e}
           type="button"
           onClick={() => onPick(e)}
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-lg hover:bg-slate-100 transition active:scale-90"
+          style={{
+            width: 36, height: 36, borderRadius: 12,
+            border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform 0.1s',
+          }}
+          onMouseOver={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.3)' }}
+          onMouseOut={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
         >
           {e}
         </button>
@@ -825,17 +1008,41 @@ function ConfirmDialog({ message, onConfirm, onCancel }: {
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="fixed inset-x-4 top-1/2 z-50 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
-        <p className="font-semibold text-slate-900">{message}</p>
-        <p className="mt-1 text-sm text-slate-500">This action cannot be undone.</p>
-        <div className="mt-4 flex gap-3">
-          <button onClick={onCancel}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)' }}
+        onClick={onCancel}
+      />
+      <div style={{
+        position: 'fixed', left: '50%', top: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 50, width: 320,
+        background: '#fff', borderRadius: 20,
+        padding: '24px 20px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+      }}>
+        <p style={{ fontWeight: 700, fontSize: 16, color: '#111827', margin: 0 }}>{message}</p>
+        <p style={{ marginTop: 6, fontSize: 13, color: '#6B7280' }}>This action cannot be undone.</p>
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: '11px 0', borderRadius: 12,
+              border: '1.5px solid #E5E7EB', background: '#fff',
+              fontSize: 14, fontWeight: 700, color: '#374151', cursor: 'pointer',
+              fontFamily: '"Nunito", sans-serif',
+            }}
+          >
             Cancel
           </button>
-          <button onClick={onConfirm}
-            className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition">
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: '11px 0', borderRadius: 12,
+              border: 'none', background: '#EF4444',
+              fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer',
+              fontFamily: '"Nunito", sans-serif',
+            }}
+          >
             Delete
           </button>
         </div>
@@ -844,7 +1051,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: {
   )
 }
 
-function TabButton({ active, onClick, children }: {
+function TabBtn({ active, onClick, children }: {
   active:   boolean
   onClick:  () => void
   children: React.ReactNode
@@ -853,11 +1060,15 @@ function TabButton({ active, onClick, children }: {
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 py-2.5 text-xs font-semibold transition border-b-2
-        ${active
-          ? 'border-indigo-600 text-indigo-700'
-          : 'border-transparent text-slate-500 hover:text-slate-700'
-        }`}
+      style={{
+        flex: 1, padding: '10px 0', border: 'none',
+        background: 'none', cursor: 'pointer',
+        fontSize: 13, fontWeight: 800,
+        fontFamily: '"Nunito", sans-serif',
+        color: active ? ORANGE : '#9CA3AF',
+        borderBottom: `2.5px solid ${active ? ORANGE : 'transparent'}`,
+        transition: 'all 0.15s',
+      }}
     >
       {children}
     </button>
@@ -868,15 +1079,16 @@ function TabButton({ active, onClick, children }: {
 
 function SendIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4 20-7z" />
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 2L11 13" />
+      <path d="M22 2L15 22l-4-9-9-4 20-7z" />
     </svg>
   )
 }
 
-function TrashIcon({ className = '' }: { className?: string }) {
+function TrashIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
     </svg>
   )

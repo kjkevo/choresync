@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
-import type { ActivityEntry, HouseholdSummary, HouseholdChoreRow } from './DashboardClient'
+import type { ActivityEntry, HouseholdSummary, HouseholdChoreRow, LeaderboardEntry } from './DashboardClient'
 import type {
   ChoreRow,
   ChoreWithAssignee,
@@ -175,7 +175,24 @@ export default async function DashboardPage({
     author: pinnedAuthorMap[a.created_by] ?? null,
   }))
 
-  // ── 6. Recent activity feed ───────────────────────────────────────────────
+  // ── 6. Leaderboard — all members ranked by total points ──────────────────
+  const { data: allStreaksRaw } = await supabase
+    .from('user_streaks')
+    .select('user_id, total_completions, current_streak')
+    .eq('household_id', householdId)
+    .order('total_completions', { ascending: false })
+    .limit(20)
+
+  const leaderboard: LeaderboardEntry[] = (allStreaksRaw ?? []).map(s => ({
+    userId:        s.user_id as string,
+    name:          profileMap[s.user_id as string]?.full_name ?? null,
+    avatarUrl:     profileMap[s.user_id as string]?.avatar_url ?? null,
+    color:         colorMap[s.user_id as string] ?? '#6366f1',
+    totalPoints:   (s.total_completions as number) ?? 0,
+    currentStreak: (s.current_streak as number) ?? 0,
+  })).sort((a, b) => b.totalPoints - a.totalPoints)
+
+  // ── 7. Recent activity feed ───────────────────────────────────────────────
   const { data: completionsRaw } = await supabase
     .from('chore_completions')
     .select('*')
@@ -228,6 +245,7 @@ export default async function DashboardPage({
       recentActivity={recentActivity}
       allHouseholds={allHouseholds}
       householdAllChores={householdAllChores}
+      leaderboard={leaderboard}
     />
   )
 }

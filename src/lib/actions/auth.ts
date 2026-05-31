@@ -34,15 +34,16 @@ export async function signUp(formData: FormData) {
 export async function logIn(formData: FormData) {
   const supabase = await createClient()
 
-  const email    = formData.get('email')    as string
-  const password = formData.get('password') as string
+  const email      = formData.get('email')      as string
+  const password   = formData.get('password')   as string
+  const redirectTo = (formData.get('redirectTo') as string | null) ?? '/dashboard'
 
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) return { error: error.message }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect(redirectTo)
 }
 
 // ── Sign Out ──────────────────────────────────────────────────────────────────

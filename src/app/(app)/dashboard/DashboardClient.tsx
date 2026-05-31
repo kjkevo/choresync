@@ -84,6 +84,15 @@ export interface HouseholdSummary {
   name: string
 }
 
+export interface LeaderboardEntry {
+  userId:        string
+  name:          string | null
+  avatarUrl:     string | null
+  color:         string
+  totalPoints:   number
+  currentStreak: number
+}
+
 interface DashboardClientProps {
   currentUser:         UserRow
   myOverdueChores:     ChoreWithAssignee[]
@@ -96,6 +105,7 @@ interface DashboardClientProps {
   recentActivity:      ActivityEntry[]
   allHouseholds?:      HouseholdSummary[]
   householdAllChores?: HouseholdChoreRow[]
+  leaderboard?:        LeaderboardEntry[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -112,6 +122,7 @@ export default function DashboardClient({
   recentActivity:     initialActivity,
   allHouseholds = [],
   householdAllChores = [],
+  leaderboard = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const { t } = useLanguage()
@@ -353,7 +364,7 @@ export default function DashboardClient({
                 </p>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: '6px 0 0' }}>
                   Check the{' '}
-                  <a href="/custom" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom tab</a>
+                  <a href="/profile" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom tab</a>
                   {' '}for upcoming tasks
                 </p>
               </div>
@@ -384,7 +395,7 @@ export default function DashboardClient({
               }}>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
                   No chores yet — create some in{' '}
-                  <a href="/custom" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom ✨</a>
+                  <a href="/profile" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom ✨</a>
                 </p>
               </div>
             ) : (
@@ -439,6 +450,62 @@ export default function DashboardClient({
               </div>
             )}
           </section>
+
+          {/* ── Rankings ─────────────────────────────────────────────────────── */}
+          {leaderboard.length > 0 && (
+            <section style={{ marginBottom: 20 }}>
+              <SectionTitle icon="🏆" label="Rankings" color="#B45309" />
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                {leaderboard.slice(0, 5).map((entry, i) => {
+                  const isMe    = entry.userId === currentUser.id
+                  const medals  = ['🥇', '🥈', '🥉']
+                  const rankBadge = medals[i] ?? `#${i + 1}`
+                  const isEmoji = entry.avatarUrl?.startsWith('emoji:')
+                  return (
+                    <div
+                      key={entry.userId}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '11px 16px',
+                        borderBottom: i < Math.min(leaderboard.length, 5) - 1 ? '1px solid #F7F8FA' : 'none',
+                        background: isMe ? '#FFF9F7' : 'transparent',
+                        borderLeft: isMe ? `3px solid #FF6B2B` : '3px solid transparent',
+                      }}
+                    >
+                      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{rankBadge}</span>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: entry.color, flexShrink: 0, overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
+                      }}>
+                        {isEmoji ? entry.avatarUrl!.slice(6) : (entry.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? '?')}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          margin: 0, fontSize: 13, fontWeight: isMe ? 800 : 600,
+                          color: isMe ? '#FF6B2B' : '#111827',
+                          fontFamily: '"Poppins", sans-serif',
+                        }}>
+                          {isMe ? 'You' : (entry.name ?? 'Unknown')}
+                        </p>
+                        {entry.currentStreak >= 2 && (
+                          <p style={{ margin: 0, fontSize: 11, color: '#EA580C' }}>🔥 {entry.currentStreak}-day streak</p>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 13, fontWeight: 800,
+                        color: '#B45309', background: '#FFFBEB',
+                        borderRadius: 99, padding: '3px 10px', flexShrink: 0,
+                      }}>
+                        {entry.totalPoints} pts
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
 
           {/* ── Onboarding card (shown when dashboard is completely empty) ──────── */}
           {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
