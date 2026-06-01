@@ -13,13 +13,22 @@ export async function signUp(formData: FormData) {
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
 
+  // Derive the site origin — prefer explicit env var, fall back to production URL
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ??
+    'https://choresync-theta.vercel.app'
+
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { full_name: fullName },
-      // Supabase sends a confirmation email; the link calls /auth/callback
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      data: {
+        full_name:  fullName,
+        first_name: formData.get('firstName') as string | null,
+        last_name:  formData.get('lastName')  as string | null,
+      },
+      // Supabase sends a confirmation email; clicking the link hits /auth/callback
+      emailRedirectTo: `${siteUrl}/auth/callback?next=/onboarding`,
     },
   })
 
