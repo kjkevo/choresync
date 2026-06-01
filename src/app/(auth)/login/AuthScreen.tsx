@@ -208,36 +208,15 @@ export default function AuthScreen({
                 fontFamily: "'Poppins', sans-serif", fontWeight: 700,
                 fontSize: 28, color: '#0f172a', margin: 0,
               }}>
-                {tab === 'login' ? 'Welcome back 👋' : 'Create your account'}
+                Welcome back 👋
               </h1>
               <p style={{ marginTop: 6, fontSize: 14, color: '#64748b' }}>
-                {tab === 'login'
-                  ? 'Sign in to manage your household chores'
-                  : "Set up your household in minutes — it's free"}
+                Sign in to manage your household chores
               </p>
             </div>
 
-            {/* Tab toggle */}
-            <div style={{
-              display: 'flex', borderRadius: 12,
-              padding: 4, marginBottom: 28,
-              background: '#f1f5f9',
-            }}>
-              {(['login', 'signup'] as Tab[]).map(t => (
-                <TabButton
-                  key={t}
-                  active={tab === t}
-                  label={t === 'login' ? 'Sign In' : 'Sign Up'}
-                  onClick={() => setTab(t)}
-                />
-              ))}
-            </div>
-
-            {/* Forms */}
-            {tab === 'login'
-              ? <LoginForm redirectTo={redirectTo} />
-              : <SignupForm onSuccess={() => setTab('login')} />
-            }
+            {/* Forms — sign-up disabled until launch */}
+            <LoginForm redirectTo={redirectTo} />
           </div>
         </div>
       </div>
@@ -336,11 +315,8 @@ function LoginForm({ redirectTo }: { redirectTo: string }) {
         <SubmitButton loading={isPending} label="Sign In" loadingLabel="Signing in…" />
       </form>
 
-      <p style={{ textAlign: 'center', fontSize: 14, color: '#64748b', margin: 0 }}>
-        Don&apos;t have an account?{' '}
-        <Link href="/login?tab=signup" style={{ fontWeight: 600, color: '#FF6B2B', textDecoration: 'none' }}>
-          Sign up free
-        </Link>
+      <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', margin: 0 }}>
+        New accounts are currently invite-only.
       </p>
     </div>
   )
