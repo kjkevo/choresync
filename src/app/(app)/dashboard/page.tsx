@@ -35,8 +35,8 @@ export default async function DashboardPage({
         currentUser={demoUser}
         myOverdueChores={[]}
         myTodayChores={[
-          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'general' as const, status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 1, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
-          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'outdoor' as const, status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 2, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'general' as const, status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 'medium' as const, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'outdoor' as const, status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 'low' as const, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
         ]}
         householdName="Sunrise Apartment"
         householdId="demo-hh"
