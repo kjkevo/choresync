@@ -35,8 +35,8 @@ export default async function DashboardPage({
         currentUser={demoUser}
         myOverdueChores={[]}
         myTodayChores={[
-          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'cleaning', status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 1, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
-          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'trash', status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 2, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'general' as const, status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 1, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'outdoor' as const, status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 2, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
         ]}
         householdName="Sunrise Apartment"
         householdId="demo-hh"
@@ -44,16 +44,16 @@ export default async function DashboardPage({
         myStreak={{ current_streak: 5, total_completions: 42 }}
         pinnedAnnouncements={[]}
         recentActivity={[
-          { id: 'a1', choreName: 'Dishes', category: 'cleaning', completedAt: new Date(Date.now() - 3600000).toISOString(), points: 8, wasOnTime: true, reactions: [{ emoji: '🔥', userId: 'm2' }], member: { id: 'm2', name: 'Alex Kim', avatarUrl: null, color: '#8b5cf6' } },
-          { id: 'a2', choreName: 'Mop Kitchen', category: 'cleaning', completedAt: new Date(Date.now() - 7200000).toISOString(), points: 12, wasOnTime: true, reactions: [], member: { id: 'm3', name: 'Sam Torres', avatarUrl: null, color: '#10b981' } },
+          { id: 'a1', choreName: 'Dishes', category: 'kitchen', completedAt: new Date(Date.now() - 3600000).toISOString(), points: 8, wasOnTime: true, reactions: [{ emoji: '🔥', userId: 'm2' }], member: { id: 'm2', name: 'Alex Kim', avatarUrl: null, color: '#8b5cf6' } },
+          { id: 'a2', choreName: 'Mop Kitchen', category: 'kitchen', completedAt: new Date(Date.now() - 7200000).toISOString(), points: 12, wasOnTime: true, reactions: [], member: { id: 'm3', name: 'Sam Torres', avatarUrl: null, color: '#10b981' } },
           { id: 'a3', choreName: 'Clean Bathroom', category: 'bathroom', completedAt: new Date(Date.now() - 86400000).toISOString(), points: 15, wasOnTime: false, reactions: [{ emoji: '💪', userId: 'demo' }], member: { id: 'm4', name: 'Riley Chen', avatarUrl: null, color: '#3b82f6' } },
         ]}
         allHouseholds={[{ id: 'demo-hh', name: 'Sunrise Apartment' }]}
         householdAllChores={[
-          { id: 'c1', name: 'Vacuum Living Room', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 10, category: 'cleaning' },
-          { id: 'c2', name: 'Take Out Trash', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 5, category: 'trash' },
-          { id: 'c3', name: 'Dishes', status: 'complete', assigned_to: 'm2', assigneeName: 'Alex Kim', points: 8, category: 'cleaning' },
-          { id: 'c4', name: 'Mop Kitchen', status: 'complete', assigned_to: 'm3', assigneeName: 'Sam Torres', points: 12, category: 'cleaning' },
+          { id: 'c1', name: 'Vacuum Living Room', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 10, category: 'general' },
+          { id: 'c2', name: 'Take Out Trash', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 5, category: 'outdoor' },
+          { id: 'c3', name: 'Dishes', status: 'complete', assigned_to: 'm2', assigneeName: 'Alex Kim', points: 8, category: 'kitchen' },
+          { id: 'c4', name: 'Mop Kitchen', status: 'complete', assigned_to: 'm3', assigneeName: 'Sam Torres', points: 12, category: 'kitchen' },
         ]}
         leaderboard={[
           { userId: 'm3', name: 'Sam Torres', avatarUrl: null, color: '#10b981', totalPoints: 87, currentStreak: 8 },
