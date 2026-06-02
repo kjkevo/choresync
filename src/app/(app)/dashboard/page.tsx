@@ -26,8 +26,44 @@ export default async function DashboardPage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Not signed in → start onboarding flow
-  if (!user) redirect('/onboarding')
+  // ── DEMO MODE: no auth required while building ────────────────────────────
+  if (!user) {
+    const today = new Date().toISOString().split('T')[0]
+    const demoUser = { id: 'demo', full_name: 'Jordan Rivera', avatar_url: null, email: 'jordan@example.com' }
+    return (
+      <DashboardClient
+        currentUser={demoUser}
+        myOverdueChores={[]}
+        myTodayChores={[
+          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'cleaning', status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 1, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'trash', status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 2, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+        ]}
+        householdName="Sunrise Apartment"
+        householdId="demo-hh"
+        colorMap={{ demo: '#FF6B2B', m2: '#8b5cf6', m3: '#10b981', m4: '#3b82f6' }}
+        myStreak={{ current_streak: 5, total_completions: 42 }}
+        pinnedAnnouncements={[]}
+        recentActivity={[
+          { id: 'a1', choreName: 'Dishes', category: 'cleaning', completedAt: new Date(Date.now() - 3600000).toISOString(), points: 8, wasOnTime: true, reactions: [{ emoji: '🔥', userId: 'm2' }], member: { id: 'm2', name: 'Alex Kim', avatarUrl: null, color: '#8b5cf6' } },
+          { id: 'a2', choreName: 'Mop Kitchen', category: 'cleaning', completedAt: new Date(Date.now() - 7200000).toISOString(), points: 12, wasOnTime: true, reactions: [], member: { id: 'm3', name: 'Sam Torres', avatarUrl: null, color: '#10b981' } },
+          { id: 'a3', choreName: 'Clean Bathroom', category: 'bathroom', completedAt: new Date(Date.now() - 86400000).toISOString(), points: 15, wasOnTime: false, reactions: [{ emoji: '💪', userId: 'demo' }], member: { id: 'm4', name: 'Riley Chen', avatarUrl: null, color: '#3b82f6' } },
+        ]}
+        allHouseholds={[{ id: 'demo-hh', name: 'Sunrise Apartment' }]}
+        householdAllChores={[
+          { id: 'c1', name: 'Vacuum Living Room', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 10, category: 'cleaning' },
+          { id: 'c2', name: 'Take Out Trash', status: 'incomplete', assigned_to: 'demo', assigneeName: 'Jordan Rivera', points: 5, category: 'trash' },
+          { id: 'c3', name: 'Dishes', status: 'complete', assigned_to: 'm2', assigneeName: 'Alex Kim', points: 8, category: 'cleaning' },
+          { id: 'c4', name: 'Mop Kitchen', status: 'complete', assigned_to: 'm3', assigneeName: 'Sam Torres', points: 12, category: 'cleaning' },
+        ]}
+        leaderboard={[
+          { userId: 'm3', name: 'Sam Torres', avatarUrl: null, color: '#10b981', totalPoints: 87, currentStreak: 8 },
+          { userId: 'demo', name: 'Jordan Rivera', avatarUrl: null, color: '#FF6B2B', totalPoints: 42, currentStreak: 5 },
+          { userId: 'm2', name: 'Alex Kim', avatarUrl: null, color: '#8b5cf6', totalPoints: 31, currentStreak: 3 },
+          { userId: 'm4', name: 'Riley Chen', avatarUrl: null, color: '#3b82f6', totalPoints: 24, currentStreak: 1 },
+        ]}
+      />
+    )
+  }
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([
@@ -39,9 +75,7 @@ export default async function DashboardPage({
   const profile = profileRaw as UserRow | null
 
   // No household → send to onboarding
-  if (!allMemberships || allMemberships.length === 0) {
-    redirect('/onboarding')
-  }
+  if (!allMemberships || allMemberships.length === 0) redirect('/onboarding')
 
   // Pick active household: prefer ?h= param, else first membership
   const allHouseholdIds = allMemberships.map(m => m.household_id)
