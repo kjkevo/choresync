@@ -35,8 +35,8 @@ export default async function DashboardPage({
         currentUser={demoUser}
         myOverdueChores={[]}
         myTodayChores={[
-          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'general' as const, status: 'incomplete', assigned_to: 'demo', points: 10, due_date: today, priority: 'medium' as const, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
-          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'outdoor' as const, status: 'incomplete', assigned_to: 'demo', points: 5, due_date: today, priority: 'low' as const, rotation_members: [], assignee: demoUser, description: null, frequency: 'weekly', created_at: today, updated_at: today, last_completed_at: null, next_due_date: null },
+          { id: 'c1', household_id: 'demo-hh', name: 'Vacuum Living Room', category: 'general' as const, status: 'incomplete' as const, assigned_to: 'demo', points: 10, due_date: today, priority: 'medium' as const, rotation_members: [], rotation_enabled: false, rotation_index: 0, assignee: demoUser, description: null, frequency: 'weekly' as const, created_at: today, updated_at: today, last_completed_at: null, estimated_mins: null, completed_at: null, completed_by: null, photo_proof_url: null, created_by: null, subtasks: [], require_photo: false },
+          { id: 'c2', household_id: 'demo-hh', name: 'Take Out Trash', category: 'outdoor' as const, status: 'incomplete' as const, assigned_to: 'demo', points: 5, due_date: today, priority: 'low' as const, rotation_members: [], rotation_enabled: false, rotation_index: 0, assignee: demoUser, description: null, frequency: 'weekly' as const, created_at: today, updated_at: today, last_completed_at: null, estimated_mins: null, completed_at: null, completed_by: null, photo_proof_url: null, created_by: null, subtasks: [], require_photo: false },
         ]}
         householdName="Sunrise Apartment"
         householdId="demo-hh"
