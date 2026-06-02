@@ -29,7 +29,7 @@ export default async function DashboardPage({
   // ── DEMO MODE: no auth required while building ────────────────────────────
   if (!user) {
     const today = new Date().toISOString().split('T')[0]
-    const demoUser = { id: 'demo', full_name: 'Jordan Rivera', avatar_url: null, email: 'jordan@example.com' }
+    const demoUser = { id: 'demo', full_name: 'Jordan Rivera', avatar_url: null, email: 'jordan@example.com', created_at: today, updated_at: today }
     return (
       <DashboardClient
         currentUser={demoUser}
