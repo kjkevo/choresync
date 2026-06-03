@@ -320,18 +320,27 @@ export default async function ProfilePage() {
     : { data: null }
 
   // ── 4. Completion stats ───────────────────────────────────────────────────
-  const { data: completions } = householdId
-    ? await supabase
-        .from('chore_completions')
-        .select('was_on_time, points')
-        .eq('completed_by', user.id)
-        .eq('household_id', householdId)
-    : { data: [] }
+  const [{ data: completions }, { data: pointEventsRaw }] = await Promise.all([
+    householdId
+      ? supabase
+          .from('chore_completions')
+          .select('was_on_time')
+          .eq('completed_by', user.id)
+          .eq('household_id', householdId)
+      : Promise.resolve({ data: [] }),
+    householdId
+      ? supabase
+          .from('point_events')
+          .select('points')
+          .eq('user_id', user.id)
+          .eq('household_id', householdId)
+      : Promise.resolve({ data: [] }),
+  ])
 
   const totalChores  = (completions ?? []).length
   const onTimeCount  = (completions ?? []).filter(c => c.was_on_time).length
   const onTimeRate   = totalChores > 0 ? Math.round((onTimeCount / totalChores) * 100) : 0
-  const totalPoints  = (completions ?? []).reduce((s, c) => s + (c.points ?? 0), 0)
+  const totalPoints  = ((pointEventsRaw ?? []) as { points: number }[]).reduce((s, r) => s + r.points, 0)
 
   // ── 5. Top earner? ────────────────────────────────────────────────────────
   const { data: topStreak } = householdId
