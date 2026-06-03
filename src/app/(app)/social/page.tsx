@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SocialClient from './SocialClient'
 import ChatDemoClient from './ChatDemoClient'
@@ -18,7 +19,7 @@ export default async function SocialPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Not signed in — show interactive demo chat
+  // Not signed in — show interactive demo chat (marketing preview)
   if (!user) return <ChatDemoClient />
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
@@ -30,7 +31,8 @@ export default async function SocialPage() {
   ])
   const profile = profileRaw as UserRow | null
 
-  if (!membership) return <ChatDemoClient />
+  // Signed in but no household yet — go to onboarding
+  if (!membership) redirect('/onboarding')
 
   const { household_id: householdId, role } = membership
   const isAdmin = role === 'admin'
