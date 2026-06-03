@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SocialClient from './SocialClient'
-import ChatDemoClient from './ChatDemoClient'
 import type {
   UserRow,
   MessageRow,
@@ -19,8 +18,8 @@ export default async function SocialPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Not signed in — show interactive demo chat (marketing preview)
-  if (!user) return <ChatDemoClient />
+  // No session → onboarding (middleware handles this first, but be defensive)
+  if (!user) redirect('/onboarding')
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([
@@ -31,7 +30,7 @@ export default async function SocialPage() {
   ])
   const profile = profileRaw as UserRow | null
 
-  // Signed in but no household yet — go to onboarding
+  // No household → onboarding
   if (!membership) redirect('/onboarding')
 
   const { household_id: householdId, role } = membership
@@ -55,15 +54,15 @@ export default async function SocialPage() {
   const memberProfiles = (memberProfilesRaw ?? []) as UserRow[]
   const profileMap: Record<string, UserRow> = Object.fromEntries(memberProfiles.map(p => [p.id, p]))
 
-  // ── 3. Last 80 messages + their reactions ─────────────────────────────────
+  // ── 3. Last 80 messages ordered by timestamp, scoped to this household ────
   const { data: rawMessagesRaw } = await supabase
     .from('messages')
     .select('*')
     .eq('household_id', householdId)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })   // oldest first so the list reads top→bottom
     .limit(80)
 
-  const messages = ((rawMessagesRaw ?? []) as MessageRow[]).reverse()
+  const messages = (rawMessagesRaw ?? []) as MessageRow[]
   const messageIds = messages.map(m => m.id)
 
   const { data: reactionsRaw } = messageIds.length
