@@ -353,8 +353,10 @@ function ChatTab({
 
   return (
     <>
-      {/* Scroll area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px' }}>
+      {/* Scroll area — minHeight:0 is required so flex:1 can actually shrink
+          below its content height and let overflowY:auto scroll instead of
+          pushing the input bar off screen */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px', minHeight: 0 }}>
 
         {messages.length === 0 && (
           <div style={{
@@ -702,7 +704,7 @@ function AnnouncementsTab({
 
   return (
     <div style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 24px', minHeight: 0 }}>
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Compose (admin only) */}
