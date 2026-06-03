@@ -323,8 +323,9 @@ export async function completeChore(choreId: string, photoProofUrl?: string) {
     ? (todayStr <= chore.due_date ? true : false)
     : null
 
-  // Non-blocking — don't fail the completion if this errors
-  void supabase.from('chore_completions').insert({
+  // Must be awaited — serverless functions are terminated after the response,
+  // so fire-and-forget inserts (void) can be silently dropped before reaching the DB.
+  await supabase.from('chore_completions').insert({
     household_id:    chore.household_id,
     chore_id:        choreId,
     chore_name:      chore.name,
@@ -338,7 +339,7 @@ export async function completeChore(choreId: string, photoProofUrl?: string) {
     photo_proof_url: photoProofUrl ?? null,
   })
 
-  // Award points (non-blocking — don't fail the completion if this errors)
+  // Award points
   if (chore.points > 0) {
     await supabase.from('point_events').insert({
       user_id:      user.id,
