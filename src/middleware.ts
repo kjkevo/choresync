@@ -1,10 +1,42 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createMiddlewareClient } from '@/lib/supabase/middleware'
 
-// Auth gates are disabled during active app development.
-// All routes are open — the app always opens directly to /dashboard.
+/**
+ * Protected app routes — redirect to /onboarding when no valid session.
+ * Public routes (login, signup, onboarding, join, privacy, terms) are
+ * always accessible without a session.
+ */
+const PUBLIC_PREFIXES = [
+  '/onboarding',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/join/',
+  '/privacy',
+  '/terms',
+]
+
 export async function middleware(request: NextRequest) {
-  const { response } = createMiddlewareClient(request)
+  const { supabase, response } = createMiddlewareClient(request)
+
+  // MUST call getUser() here — this is what refreshes the Supabase session
+  // cookie and ensures downstream server components see a valid (or absent) user.
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+
+  // Allow public routes through regardless of auth state
+  const isPublic = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+  if (isPublic) return response
+
+  // Unauthenticated requests to any app route → send to onboarding
+  if (!user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/onboarding'
+    return NextResponse.redirect(url)
+  }
+
   return response
 }
 
