@@ -125,7 +125,7 @@ export default async function DashboardPage({
   // ── 5. Household name + my streak + pinned announcements ─────────────────
   const activeHousehold = allHouseholds.find(h => h.id === householdId)
 
-  const [{ data: myStreak }, { data: pinnedRowsRaw }] = await Promise.all([
+  const [{ data: myStreak }, { data: pinnedRowsRaw }, { data: myPointsRaw }] = await Promise.all([
     supabase.from('user_streaks')
       .select('current_streak, total_completions')
       .eq('user_id', user.id)
@@ -137,7 +137,14 @@ export default async function DashboardPage({
       .eq('is_pinned', true)
       .order('pinned_at', { ascending: false })
       .limit(3),
+    supabase.from('point_events')
+      .select('points')
+      .eq('user_id', user.id)
+      .eq('household_id', householdId),
   ])
+
+  const myTotalPoints = ((myPointsRaw ?? []) as { points: number }[]).reduce((sum, r) => sum + r.points, 0)
+  const myStreakWithPoints = myStreak ? { ...myStreak, total_completions: myTotalPoints } : null
 
   const pinnedRows = (pinnedRowsRaw ?? []) as AnnouncementRow[]
 
@@ -154,21 +161,38 @@ export default async function DashboardPage({
     author: pinnedAuthorMap[a.created_by] ?? null,
   }))
 
-  // ── 6. Leaderboard — all members ranked by total points ──────────────────
-  const { data: allStreaksRaw } = await supabase
-    .from('user_streaks')
-    .select('user_id, total_completions, current_streak')
-    .eq('household_id', householdId)
-    .order('total_completions', { ascending: false })
-    .limit(20)
+  // ── 6. Leaderboard — ranked by real accumulated points from point_events ───
+  const [{ data: allStreaksRaw }, { data: pointTotalsRaw }] = await Promise.all([
+    supabase
+      .from('user_streaks')
+      .select('user_id, total_completions, current_streak')
+      .eq('household_id', householdId)
+      .limit(20),
+    supabase
+      .from('point_events')
+      .select('user_id, points')
+      .eq('household_id', householdId),
+  ])
 
-  const leaderboard: LeaderboardEntry[] = (allStreaksRaw ?? []).map(s => ({
-    userId:        s.user_id as string,
-    name:          profileMap[s.user_id as string]?.full_name ?? null,
-    avatarUrl:     profileMap[s.user_id as string]?.avatar_url ?? null,
-    color:         colorMap[s.user_id as string] ?? '#6366f1',
-    totalPoints:   (s.total_completions as number) ?? 0,
-    currentStreak: (s.current_streak as number) ?? 0,
+  // Sum points per user from point_events
+  const pointsByUser: Record<string, number> = {}
+  for (const row of (pointTotalsRaw ?? []) as { user_id: string; points: number }[]) {
+    pointsByUser[row.user_id] = (pointsByUser[row.user_id] ?? 0) + row.points
+  }
+
+  const streakMap: Record<string, { total_completions: number; current_streak: number }> =
+    Object.fromEntries(
+      ((allStreaksRaw ?? []) as { user_id: string; total_completions: number; current_streak: number }[])
+        .map(s => [s.user_id, s])
+    )
+
+  const leaderboard: LeaderboardEntry[] = memberUserIds.map(uid => ({
+    userId:        uid,
+    name:          profileMap[uid]?.full_name ?? null,
+    avatarUrl:     profileMap[uid]?.avatar_url ?? null,
+    color:         colorMap[uid] ?? '#6366f1',
+    totalPoints:   pointsByUser[uid] ?? 0,
+    currentStreak: streakMap[uid]?.current_streak ?? 0,
   })).sort((a, b) => b.totalPoints - a.totalPoints)
 
   // ── 7. Recent activity feed ───────────────────────────────────────────────
@@ -219,7 +243,7 @@ export default async function DashboardPage({
       householdName={activeHousehold?.name ?? 'Your Household'}
       householdId={householdId}
       colorMap={colorMap}
-      myStreak={myStreak ?? null}
+      myStreak={myStreakWithPoints ?? null}
       pinnedAnnouncements={pinnedAnnouncements}
       recentActivity={recentActivity}
       allHouseholds={allHouseholds}
