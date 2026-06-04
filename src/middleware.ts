@@ -30,12 +30,13 @@ export async function middleware(request: NextRequest) {
   const isPublic = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
   if (isPublic) return response
 
+  // TODO: re-enable auth gate before launch
   // Unauthenticated requests to any app route → send to onboarding
-  if (!user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/onboarding'
-    return NextResponse.redirect(url)
-  }
+  // if (!user) {
+  //   const url = request.nextUrl.clone()
+  //   url.pathname = '/onboarding'
+  //   return NextResponse.redirect(url)
+  // }
 
   return response
 }
