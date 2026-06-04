@@ -93,6 +93,13 @@ export interface LeaderboardEntry {
   currentStreak: number
 }
 
+interface MemberSummary {
+  id:        string
+  name:      string | null
+  avatarUrl: string | null
+  color:     string
+}
+
 interface DashboardClientProps {
   currentUser:         UserRow
   myOverdueChores:     ChoreWithAssignee[]
@@ -106,6 +113,7 @@ interface DashboardClientProps {
   allHouseholds?:      HouseholdSummary[]
   householdAllChores?: HouseholdChoreRow[]
   leaderboard?:        LeaderboardEntry[]
+  members?:            MemberSummary[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -123,6 +131,7 @@ export default function DashboardClient({
   allHouseholds = [],
   householdAllChores = [],
   leaderboard = [],
+  members = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const { t } = useLanguage()
@@ -354,20 +363,17 @@ export default function DashboardClient({
           <section style={{ marginBottom: 20 }}>
             <SectionTitle icon="📋" label={t('dueToday')} count={todayChores.length} color="#FF6B2B" />
             {todayChores.length === 0 ? (
-              <div style={{
-                background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
-                padding: '32px 20px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>✅</div>
-                <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 15, color: '#374151', margin: 0 }}>
-                  {overdueChores.length > 0 ? t('noChores') : t('nothingDueToday')}
-                </p>
-                <p style={{ fontSize: 13, color: '#9CA3AF', margin: '6px 0 0' }}>
-                  Check the{' '}
-                  <a href="/profile" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom tab</a>
-                  {' '}for upcoming tasks
-                </p>
-              </div>
+              householdAllChores.length > 0 ? null : (
+                <div style={{
+                  background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
+                  padding: '24px 20px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+                  <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 14, color: '#374151', margin: 0 }}>
+                    No chores due today
+                  </p>
+                </div>
+              )
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {todayChores.map(chore => (
@@ -387,15 +393,14 @@ export default function DashboardClient({
 
           {/* ── Household Chores ──────────────────────────────────────────────── */}
           <section style={{ marginBottom: 20 }}>
-            <SectionTitle icon="🏠" label="Household" color="#374151" />
+            <SectionTitle icon="🏠" label="Household Chores" color="#374151" />
             {householdAllChores.length === 0 ? (
               <div style={{
                 background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
                 padding: '24px 20px', textAlign: 'center',
               }}>
                 <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                  No chores yet — create some in{' '}
-                  <a href="/profile" style={{ color: '#FF6B2B', fontWeight: 700, textDecoration: 'none' }}>Custom ✨</a>
+                  No chores set up yet — complete onboarding to add chores.
                 </p>
               </div>
             ) : (
@@ -507,37 +512,70 @@ export default function DashboardClient({
             </section>
           )}
 
-          {/* ── Onboarding card (shown when dashboard is completely empty) ──────── */}
-          {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
-            <div style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              borderRadius: 20, padding: '28px 24px', marginBottom: 16, color: '#fff',
-            }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
-              <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 20, margin: '0 0 8px' }}>
-                Welcome to ChoreSync!
-              </h3>
-              <p style={{ fontSize: 14, opacity: 0.9, margin: '0 0 20px', lineHeight: 1.5 }}>
-                Your household dashboard is ready. Add your first chore or invite a roommate to get started.
-              </p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <a href="/chores" style={{
-                  background: '#fff', color: '#6366f1', borderRadius: 12,
-                  padding: '10px 18px', fontSize: 14, fontWeight: 700,
-                  textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}>
-                  ✅ Add first chore
-                </a>
+          {/* ── Members section ──────────────────────────────────────────────── */}
+          {members.length > 0 && (
+            <section style={{ marginBottom: 20 }}>
+              <SectionTitle icon="👥" label="Members" color="#374151" />
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
+                padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              }}>
+                {members.map(m => {
+                  const isMe = m.id === currentUser.id
+                  const isEmoji = m.avatarUrl?.startsWith('emoji:')
+                  return (
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        background: m.color, overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: isEmoji ? 22 : 14, fontWeight: 700, color: '#fff',
+                        border: isMe ? '2.5px solid #FF6B2B' : '2.5px solid transparent',
+                      }}>
+                        {isEmoji
+                          ? m.avatarUrl!.slice(6)
+                          : m.avatarUrl
+                            ? <Image src={m.avatarUrl} alt={m.name ?? ''} width={44} height={44} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
+                            : initials(m.name)
+                        }
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isMe ? '#FF6B2B' : '#6B7280', maxWidth: 48, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        {isMe ? 'You' : (m.name?.split(' ')[0] ?? '?')}
+                      </span>
+                    </div>
+                  )
+                })}
                 <a href="/household" style={{
-                  background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 12,
-                  padding: '10px 18px', fontSize: 14, fontWeight: 700,
-                  textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
-                  border: '1px solid rgba(255,255,255,0.3)',
-                }}>
-                  👥 Invite roommate
+                  width: 44, height: 44, borderRadius: '50%',
+                  background: '#F3F4F6', border: '2px dashed #D1D5DB',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, textDecoration: 'none', color: '#9CA3AF',
+                  flexShrink: 0,
+                }} title="Manage household">
+                  +
                 </a>
               </div>
-            </div>
+            </section>
+          )}
+
+          {/* ── Chat CTA (when no activity yet) ──────────────────────────────── */}
+          {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
+            <a href="/social" style={{
+              display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none',
+              background: 'linear-gradient(135deg, #FF6B2B 0%, #ff9a5c 100%)',
+              borderRadius: 20, padding: '22px 20px', marginBottom: 16,
+            }}>
+              <span style={{ fontSize: 36, flexShrink: 0 }}>💬</span>
+              <div>
+                <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 16, color: '#fff', margin: '0 0 4px' }}>
+                  Say hi in the household chat
+                </p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', margin: 0 }}>
+                  Be the first to post in {householdName}
+                </p>
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 20, flexShrink: 0 }}>→</span>
+            </a>
           )}
 
           {/* ── Activity feed ─────────────────────────────────────────────────── */}

@@ -96,7 +96,7 @@ function primaryBtn(disabled: boolean): React.CSSProperties {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function OnboardingClient({ displayName, isLoggedIn }: { displayName: string; isLoggedIn: boolean }) {
+export default function OnboardingClient({ displayName, isLoggedIn, userId }: { displayName: string; isLoggedIn: boolean; userId: string | null }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [step, setStep] = useState<Step>('welcome')
@@ -263,6 +263,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
     if (!household) return
     clearError()
     if (!isLoggedIn) { router.push('/dashboard'); return }   // preview bypass — skip success, go straight to dashboard
+    const today = new Date().toISOString().split('T')[0]
     startTransition(async () => {
       for (const chore of chores) {
         const name = chore.name.trim()
@@ -273,6 +274,11 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
         fd.append('points', String(chore.points))
         fd.append('frequency', chore.freq)
         fd.append('category', 'general')
+        fd.append('due_date', today)   // show immediately in dashboard
+        // Assign "me" chores to the actual logged-in user
+        if (chore.assignTo === 'me' && userId) {
+          fd.append('assigned_to', userId)
+        }
         const result = await createChore(fd)
         if (result && 'error' in result && result.error) {
           setError(result.error)
@@ -449,6 +455,21 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                   </p>
                 </button>
               </div>
+
+              {/* Dashboard shortcut — quick access for dev/returning users */}
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard')}
+                style={{
+                  display: 'block', width: '100%', marginTop: 20,
+                  padding: '11px', borderRadius: 12,
+                  border: '1.5px solid #E5E7EB', background: 'transparent',
+                  fontSize: 13, fontWeight: 700, color: '#6B7280',
+                  cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                }}
+              >
+                → Go to Dashboard
+              </button>
             </div>
           )}
 

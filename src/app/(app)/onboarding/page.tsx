@@ -21,5 +21,5 @@ export default async function OnboardingPage() {
     user?.email?.split('@')[0] ??
     ''
 
-  return <OnboardingClient displayName={displayName} isLoggedIn={!!user} />
+  return <OnboardingClient displayName={displayName} isLoggedIn={!!user} userId={user?.id ?? null} />
 }

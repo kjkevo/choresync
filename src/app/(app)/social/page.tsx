@@ -18,8 +18,28 @@ export default async function SocialPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // No session → onboarding (middleware handles this first, but be defensive)
-  if (!user) redirect('/onboarding')
+  // TODO: re-enable before launch
+  // No session → preview mode (show empty chat UI, messages can't be sent without auth)
+  if (!user) {
+    const guestUser: UserRow = {
+      id: '', email: '', full_name: 'Guest', avatar_url: null,
+      username: null, tagline: null, google_calendar_refresh_token: null,
+      created_at: '', updated_at: '',
+    }
+    return (
+      <SocialClient
+        currentUser={guestUser}
+        currentUserId=""
+        householdId=""
+        householdName="Your Household"
+        isAdmin={false}
+        initialMessages={[]}
+        announcements={[]}
+        members={[]}
+        colorMap={{}}
+      />
+    )
+  }
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([

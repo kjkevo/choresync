@@ -284,6 +284,13 @@ export default async function DashboardPage({
       : null,
   }))
 
+  const members = memberUserIds.map(uid => ({
+    id:        uid,
+    name:      profileMap[uid]?.full_name ?? null,
+    avatarUrl: profileMap[uid]?.avatar_url ?? null,
+    color:     colorMap[uid] ?? '#6366f1',
+  }))
+
   return (
     <DashboardClient
       currentUser={profile as UserRow}
@@ -298,6 +305,7 @@ export default async function DashboardPage({
       allHouseholds={allHouseholds}
       householdAllChores={householdAllChores}
       leaderboard={leaderboard}
+      members={members}
     />
   )
 }

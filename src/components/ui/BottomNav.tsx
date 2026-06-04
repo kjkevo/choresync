@@ -3,11 +3,10 @@
 import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home',     icon: <HomeIcon />     },
-  { href: '/chores',    label: 'Chores',   icon: <ChoresIcon />   },
-  { href: '/social',    label: 'Chat',     icon: <ChatIcon />     },
-  { href: '/supplies',  label: 'Supplies', icon: <SuppliesIcon /> },
-  { href: '/profile',   label: 'Profile',  icon: <PersonIcon />   },
+  { href: '/dashboard', label: 'Home',    icon: <HomeIcon />    },
+  { href: '/social',    label: 'Chat',    icon: <ChatIcon />    },
+  { href: '/rewards',   label: 'Rewards', icon: <RewardsIcon /> },
+  { href: '/profile',   label: 'Profile', icon: <PersonIcon />  },
 ] as const
 
 export default function BottomNav() {
@@ -108,12 +107,11 @@ function CalendarIcon() {
   )
 }
 
-function SuppliesIcon() {
+function RewardsIcon() {
   return (
     <svg {...IC} viewBox="0 0 24 24">
-      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <path d="M16 10a4 4 0 01-8 0" />
+      <circle cx="12" cy="8" r="6" />
+      <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11" />
     </svg>
   )
 }
