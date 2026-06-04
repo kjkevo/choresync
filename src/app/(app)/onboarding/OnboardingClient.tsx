@@ -198,7 +198,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
     const name = adminName.trim()
     if (!name) { setError('Please enter your name.'); return }
     clearError()
-    // Save name to profile
+    if (!isLoggedIn) { setStep('room-name'); return }   // preview bypass
     const fd = new FormData()
     fd.append('fullName', name)
     startTransition(async () => {
@@ -209,8 +209,14 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
 
   async function handleCreateRoom() {
     const name = roomName.trim()
-    if (name.length < 2) { setError('Room name must be at least 2 characters.'); return }
+    if (!name) { setError('Please enter a room name.'); return }
     clearError()
+    if (!isLoggedIn) {
+      // Preview bypass — mock a household so the rest of the flow works
+      setHousehold({ id: 'preview', name, invite_code: 'DEMO01' })
+      setStep('members')
+      return
+    }
     const fd = new FormData()
     fd.append('name', name)
     startTransition(async () => {
@@ -255,6 +261,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
   async function handleFinish() {
     if (!household) return
     clearError()
+    if (!isLoggedIn) { setStep('success'); return }   // preview bypass
     startTransition(async () => {
       for (const chore of chores) {
         const name = chore.name.trim()
@@ -278,6 +285,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
   function handleJoin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     clearError()
+    if (!isLoggedIn) { router.push('/dashboard'); return }  // preview bypass
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
       const result = await joinHousehold(fd)
@@ -601,7 +609,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
               <button
                 type="button"
                 onClick={handleCreateRoom}
-                disabled={isPending || roomName.trim().length < 2}
+                disabled={isPending || !roomName.trim()}
                 style={primaryBtn(isPending || roomName.trim().length < 2)}
               >
                 {isPending ? 'Creating…' : 'Continue →'}
