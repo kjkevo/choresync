@@ -135,10 +135,10 @@ export default function AuthScreen({
             {/* Feature list — only features that actually ship */}
             <ul style={{ listStyle: 'none', padding: 0, margin: '24px 0 0 0' }}>
               {[
-                'Smart scheduling based on your habits',
+                'Recurring schedules, rotation & reminders',
                 'Google & Apple Calendar sync',
-                'Offline mode — works without internet',
                 'Shared household supply list',
+                'Real-time chat, badges & leaderboard',
               ].map((text) => (
                 <li key={text} style={{
                   display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
