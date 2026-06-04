@@ -852,27 +852,33 @@ function AchievementCard({
   streak:       number
   totalChores:  number
 }) {
-  const meta    = BADGE_META[type]
-  const earned  = !!latestEarned
-  const rarity  = meta.rarity
-
-  const progress = getProgress(type, streak, totalChores)
+  const meta   = BADGE_META[type]
+  const earned = !!latestEarned
+  const rarity = meta.rarity
+  const unlock = getUnlockInfo(type, streak, totalChores)
 
   return (
     <div className={`flex flex-col items-center rounded-2xl border-2 p-4 text-center transition
       ${earned
         ? `bg-gradient-to-b ${RARITY_EARNED[rarity]} shadow-md`
-        : 'border-slate-200 bg-white opacity-60'
+        : 'border-dashed border-slate-200 bg-white'
       }`}>
+
+      {/* Badge emoji — greyscale + faded when locked */}
       <div className="relative">
-        <span className={`text-4xl leading-none ${earned ? '' : 'grayscale'}`}>{meta.emoji}</span>
+        <span className={`text-4xl leading-none ${earned ? '' : 'grayscale opacity-40'}`}>
+          {meta.emoji}
+        </span>
         {!earned && (
-          <span className="absolute -bottom-1 -right-1 text-base leading-none">🔒</span>
+          <span className="absolute -bottom-1 -right-1 text-sm leading-none">🔒</span>
         )}
       </div>
-      <p className={`mt-2 text-xs font-bold ${earned ? 'text-slate-900' : 'text-slate-400'}`}>
+
+      {/* Name */}
+      <p className={`mt-2 text-xs font-bold ${earned ? 'text-slate-900' : 'text-slate-600'}`}>
         {meta.label}
       </p>
+
       {earned ? (
         <>
           <span className={`mt-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${RARITY_LABEL[rarity]}`}>
@@ -886,20 +892,82 @@ function AchievementCard({
           </p>
         </>
       ) : (
-        <p className="mt-1.5 text-[10px] leading-snug text-slate-400">{progress}</p>
+        /* ── "How to unlock" box ── */
+        <div className="mt-3 w-full rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-left">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+            🔓 How to unlock
+          </p>
+          <p className="text-[11px] font-semibold text-slate-700 leading-snug">
+            {unlock.requirement}
+          </p>
+
+          {/* Progress bar — only for goals with a measurable count */}
+          {unlock.percent !== null && (
+            <>
+              <div className="mt-2 w-full overflow-hidden rounded-full bg-slate-200" style={{ height: 5 }}>
+                <div
+                  className="h-full rounded-full bg-indigo-400 transition-all"
+                  style={{ width: `${Math.min(unlock.percent, 100)}%` }}
+                />
+              </div>
+              <p className="mt-1 text-[10px] text-slate-400">{unlock.progressLabel}</p>
+            </>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-function getProgress(type: BadgeType, streak: number, totalChores: number): string {
+// ── Unlock info ───────────────────────────────────────────────────────────────
+
+interface UnlockInfo {
+  /** Full human-readable sentence explaining what the user must do */
+  requirement:   string
+  /** 0–100 progress percentage, or null when not measurable */
+  percent:       number | null
+  /** Short label shown below the progress bar, e.g. "3 of 10 done" */
+  progressLabel: string | null
+}
+
+function getUnlockInfo(type: BadgeType, streak: number, totalChores: number): UnlockInfo {
   switch (type) {
-    case 'first_chore':     return 'Complete your first chore'
-    case 'chores_10':       return `${totalChores}/10 chores`
-    case 'chores_100':      return `${totalChores}/100 chores`
-    case 'streak_7':        return `${streak}/7 day streak`
-    case 'streak_30':       return `${streak}/30 day streak`
-    case 'top_contributor': return 'Be #1 in points this month'
+    case 'first_chore':
+      return {
+        requirement:   'Complete your very first chore in this household',
+        percent:       null,
+        progressLabel: null,
+      }
+    case 'chores_10':
+      return {
+        requirement:   'Complete 10 chores in this household',
+        percent:       (totalChores / 10) * 100,
+        progressLabel: `${totalChores} of 10 done`,
+      }
+    case 'chores_100':
+      return {
+        requirement:   'Complete 100 chores in this household',
+        percent:       (totalChores / 100) * 100,
+        progressLabel: `${totalChores} of 100 done`,
+      }
+    case 'streak_7':
+      return {
+        requirement:   'Complete at least one chore every day for 7 consecutive days',
+        percent:       (streak / 7) * 100,
+        progressLabel: `${streak} of 7 days`,
+      }
+    case 'streak_30':
+      return {
+        requirement:   'Keep a daily completion streak going for 30 days in a row',
+        percent:       (streak / 30) * 100,
+        progressLabel: `${streak} of 30 days`,
+      }
+    case 'top_contributor':
+      return {
+        requirement:   'Earn more points than anyone else in the household within a calendar month',
+        percent:       null,
+        progressLabel: null,
+      }
   }
 }
 
