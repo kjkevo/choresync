@@ -202,21 +202,34 @@ export default function AuthScreen({
 
           <div style={{ width: '100%', maxWidth: 380 }}>
 
-            {/* Heading */}
-            <div style={{ marginBottom: 28 }}>
+            {/* Heading — changes with active tab */}
+            <div style={{ marginBottom: 24 }}>
               <h1 style={{
                 fontFamily: "'Poppins', sans-serif", fontWeight: 700,
                 fontSize: 28, color: '#0f172a', margin: 0,
               }}>
-                Welcome back 👋
+                {tab === 'login' ? 'Welcome back 👋' : 'Create an account 🏠'}
               </h1>
               <p style={{ marginTop: 6, fontSize: 14, color: '#64748b' }}>
-                Sign in to manage your household chores
+                {tab === 'login'
+                  ? 'Sign in to manage your household chores'
+                  : 'Set up your account and start syncing chores'}
               </p>
             </div>
 
-            {/* Forms — sign-up disabled until launch */}
-            <LoginForm redirectTo={redirectTo} />
+            {/* Tab strip */}
+            <div style={{
+              display: 'flex', background: '#f8fafc', borderRadius: 12,
+              padding: 4, marginBottom: 24, gap: 4,
+            }}>
+              <TabButton active={tab === 'login'}  label="Sign In"  onClick={() => setTab('login')}  />
+              <TabButton active={tab === 'signup'} label="Sign Up"  onClick={() => setTab('signup')} />
+            </div>
+
+            {tab === 'login'
+              ? <LoginForm redirectTo={redirectTo} />
+              : <SignupForm onSuccess={() => setTab('login')} />
+            }
           </div>
         </div>
       </div>
@@ -314,10 +327,6 @@ function LoginForm({ redirectTo }: { redirectTo: string }) {
 
         <SubmitButton loading={isPending} label="Sign In" loadingLabel="Signing in…" />
       </form>
-
-      <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', margin: 0 }}>
-        New accounts are currently invite-only.
-      </p>
     </div>
   )
 }
