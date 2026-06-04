@@ -97,38 +97,50 @@ export async function updatePassword(formData: FormData) {
 
 export async function updateProfile(formData: FormData) {
   const supabase  = await createClient()
-  const fullName  = formData.get('fullName')  as string
-  const avatarUrl = formData.get('avatarUrl') as string | null
+  const fullName  = (formData.get('fullName')  as string | null)?.trim() ?? null
+  const avatarUrl = formData.get('avatarUrl')  as string | null
+  const username  = (formData.get('username')  as string | null)?.trim().replace(/^@/, '') || null
+  const tagline   = (formData.get('tagline')   as string | null)?.trim() || null
 
-  // 1. Update the auth user metadata
-  const { error: metaError } = await supabase.auth.updateUser({
-    data: {
-      full_name:  fullName,
-      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-    },
-  })
-
-  if (metaError) return { error: metaError.message }
-
-  // 2. Mirror the change in public.users (trigger keeps them in sync on auth
-  //    events, but we also update directly so the change is instant)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (user) {
+  if (!user) return { error: 'Not authenticated' }
+
+  // 1. Update auth metadata for name + avatar (kept in sync with public.users)
+  if (fullName !== null || avatarUrl !== null) {
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: {
+        ...(fullName   !== null ? { full_name:  fullName  } : {}),
+        ...(avatarUrl  !== null ? { avatar_url: avatarUrl } : {}),
+      },
+    })
+    if (metaError) return { error: metaError.message }
+  }
+
+  // 2. Write all changed fields to public.users in one round-trip
+  const patch: {
+    full_name?:  string | null
+    avatar_url?: string | null
+    username?:   string | null
+    tagline?:    string | null
+  } = {}
+  if (fullName  !== null) patch.full_name  = fullName
+  if (avatarUrl !== null) patch.avatar_url = avatarUrl
+  patch.username = username   // null clears it
+  patch.tagline  = tagline    // null clears it
+
+  if (Object.keys(patch).length > 0) {
     const { error: dbError } = await supabase
       .from('users')
-      .update({
-        full_name:  fullName,
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-      })
+      .update(patch)
       .eq('id', user.id)
 
     if (dbError) return { error: dbError.message }
   }
 
-  revalidatePath('/', 'layout')
+  revalidatePath('/profile')
   return { success: true }
 }
 

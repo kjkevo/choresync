@@ -48,14 +48,16 @@ interface Membership {
 }
 
 interface ProfileClientProps {
-  user:        User
-  profile:     UserRow | null
-  membership:  Membership | null
-  householdId: string | null
-  members:     UserRow[]
-  streak:      { current_streak: number; total_completions: number } | null
-  stats:       ProfileStats
-  isTopEarner: boolean
+  user:            User
+  profile:         UserRow | null
+  membership:      Membership | null
+  householdId:     string | null
+  members:         UserRow[]
+  streak:          { current_streak: number; total_completions: number } | null
+  stats:           ProfileStats
+  isTopEarner:     boolean
+  initialUsername: string
+  initialTagline:  string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -70,6 +72,7 @@ function initials(name: string | null) {
 export default function ProfileClient({
   user, profile, membership, householdId, members,
   streak, stats, isTopEarner,
+  initialUsername, initialTagline,
 }: ProfileClientProps) {
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
   const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance'>(null)
@@ -81,9 +84,10 @@ export default function ProfileClient({
   const [copied,          setCopied]         = useState(false)
   const [avatarTab,       setAvatarTab]      = useState<'emoji' | 'photo' | 'color'>('emoji')
 
-  // Persisted local prefs
-  const [tagline,    setTagline]    = useState('')
-  const [username,   setUsername]   = useState('')
+  // Profile fields — seeded from DB via props, updated optimistically on save
+  const [tagline,    setTagline]    = useState(initialTagline)
+  const [username,   setUsername]   = useState(initialUsername)
+  // Appearance is a local-only display preference (no DB column needed)
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system')
 
   // Avatar / color
@@ -98,9 +102,9 @@ export default function ProfileClient({
   const [draftUsername, setDraftUsername] = useState('')
 
   useEffect(() => {
-    setTagline(localStorage.getItem('cs_tagline') ?? '')
-    setUsername(localStorage.getItem('cs_username') ?? '')
+    // Appearance is stored locally (cosmetic only — no server round-trip needed)
     setAppearance((localStorage.getItem('cs_appearance') as typeof appearance) ?? 'system')
+    // Sync emoji avatar from profile
     const stored = profile?.avatar_url
     if (stored?.startsWith('emoji:')) setEmojiAvatar(stored.slice(6))
   }, [profile?.avatar_url])
@@ -128,18 +132,30 @@ export default function ProfileClient({
 
   async function handleSaveTagline() {
     const t = draftTagline.trim()
-    localStorage.setItem('cs_tagline', t)
+    // Optimistic update
     setTagline(t)
-    setSuccessMsg('Tagline saved!')
     setEditModal(null)
+    const fd = new FormData()
+    fd.append('tagline', t)
+    startTransition(async () => {
+      const r = await updateProfile(fd)
+      if (r?.error) { setErrorMsg(r.error); setTagline(initialTagline) }
+      else setSuccessMsg('Tagline saved!')
+    })
   }
 
   async function handleSaveUsername() {
     const u = draftUsername.trim().replace(/^@/, '')
-    localStorage.setItem('cs_username', u)
+    // Optimistic update
     setUsername(u)
-    setSuccessMsg('Username saved!')
     setEditModal(null)
+    const fd = new FormData()
+    fd.append('username', u)
+    startTransition(async () => {
+      const r = await updateProfile(fd)
+      if (r?.error) { setErrorMsg(r.error); setUsername(initialUsername) }
+      else setSuccessMsg('Username saved!')
+    })
   }
 
   async function handleSaveEmoji() {

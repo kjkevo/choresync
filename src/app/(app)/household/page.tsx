@@ -49,7 +49,7 @@ export default async function HouseholdPage() {
 
   const { data: profiles } = await supabase
     .from('users')
-    .select('id, full_name, avatar_url, email, created_at, updated_at')
+    .select('id, full_name, avatar_url, email, username, tagline, created_at, updated_at')
     .in('id', memberIds)
 
   // Zip memberships + profiles together into enriched members
@@ -62,6 +62,8 @@ export default async function HouseholdPage() {
       email:      '',
       full_name:  null,
       avatar_url: null,
+      username:   null,
+      tagline:    null,
       created_at: '',
       updated_at: '',
     },

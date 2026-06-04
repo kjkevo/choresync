@@ -113,16 +113,20 @@ export default async function ProfilePage() {
 
   const isTopEarner = topStreak?.user_id === user.id && totalChores > 0
 
+  const profileRow = profile as UserRow
+
   return (
     <ProfileClient
       user={user}
-      profile={profile as UserRow}
+      profile={profileRow}
       membership={membership}
       householdId={householdId}
       members={members}
       streak={streakRow ?? null}
       stats={{ totalChores, onTimeRate, totalPoints }}
       isTopEarner={isTopEarner}
+      initialUsername={profileRow?.username ?? ''}
+      initialTagline={profileRow?.tagline  ?? ''}
     />
   )
 }
