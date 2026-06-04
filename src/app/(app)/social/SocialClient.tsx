@@ -11,7 +11,7 @@ import {
 } from '@/lib/actions/announcements'
 import BottomNav from '@/components/ui/BottomNav'
 import type {
-  UserRow, MessageWithMeta, MessageReactionRow,
+  UserRow, MessageRow, MessageWithMeta, MessageReactionRow,
   AnnouncementWithAuthor, MessageEmoji,
 } from '@/lib/types/database'
 
@@ -128,6 +128,7 @@ export default function SocialClient({
 
   return (
     <>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }`}</style>
       <div style={{
         height: '100dvh', display: 'flex', flexDirection: 'column',
         background: '#F7F8FA', fontFamily: '"Nunito", sans-serif',
@@ -207,15 +208,20 @@ function ChatTab({
   colorMap:        Record<string, string>
   isAdmin:         boolean
 }) {
-  const [messages,    setMessages]    = useState<MessageWithMeta[]>(initialMessages)
-  const [input,       setInput]       = useState('')
-  const [sending,     startSend]      = useTransition()
-  const [emojiFor,    setEmojiFor]    = useState<string | null>(null)
-  const [deleteFor,   setDeleteFor]   = useState<string | null>(null)
-  const [hoveredMsg,  setHoveredMsg]  = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef  = useRef<HTMLTextAreaElement>(null)
-  const supabase  = useRef(createClient())
+  const [messages,       setMessages]       = useState<MessageWithMeta[]>(initialMessages)
+  const [input,          setInput]          = useState('')
+  const [sending,        startSend]         = useTransition()
+  const [emojiFor,       setEmojiFor]       = useState<string | null>(null)
+  const [deleteFor,      setDeleteFor]      = useState<string | null>(null)
+  const [hoveredMsg,     setHoveredMsg]     = useState<string | null>(null)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
+  const bottomRef      = useRef<HTMLDivElement>(null)
+  const inputRef       = useRef<HTMLTextAreaElement>(null)
+  const supabase       = useRef(createClient())
+  // Keep memberById in a ref so the subscription never goes stale and never
+  // needs to tear-down / re-subscribe just because the members list re-rendered.
+  const memberByIdRef  = useRef(memberById)
+  useEffect(() => { memberByIdRef.current = memberById }, [memberById])
 
   const scrollToBottom = useCallback((smooth = false) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
@@ -223,65 +229,103 @@ function ChatTab({
 
   useEffect(() => { scrollToBottom() }, [scrollToBottom])
 
-  // Real-time subscription
+  // ── Real-time subscription ────────────────────────────────────────────────
+  // Intentionally NO server-side filter on postgres_changes: Supabase's
+  // row-level filter is unreliable across plans/versions and silently drops
+  // events. RLS already restricts which rows are emitted; we filter
+  // household_id client-side in each callback. memberById is accessed via
+  // ref so the effect never needs to re-run (and lose events) when the
+  // member list reference changes.
   useEffect(() => {
     const sb = supabase.current
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let cancelled = false
 
-    const channel = sb
-      .channel(`chat-${householdId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `household_id=eq.${householdId}` },
-        (payload) => {
-          const newMsg = payload.new as MessageWithMeta
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMsg.id)) return prev
-            const member = memberById[newMsg.user_id] ?? null
-            return [...prev, { ...newMsg, author: member as unknown as UserRow | null, reactions: [] }]
-          })
-          setTimeout(() => scrollToBottom(true), 50)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'messages' },
-        (payload) => {
-          const deleted = payload.old as { id: string }
-          setMessages(prev => prev.filter(m => m.id !== deleted.id))
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'message_reactions' },
-        (payload) => {
-          const r = payload.new as MessageReactionRow
-          setMessages(prev => prev.map(m =>
-            m.id !== r.message_id ? m : {
-              ...m,
-              reactions: m.reactions.some(x => x.id === r.id)
-                ? m.reactions
-                : [...m.reactions, r],
-            },
-          ))
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'message_reactions' },
-        (payload) => {
-          const deleted = payload.old as { id: string; message_id: string }
-          setMessages(prev => prev.map(m =>
-            m.id !== deleted.message_id ? m : {
-              ...m,
-              reactions: m.reactions.filter(r => r.id !== deleted.id),
-            },
-          ))
-        },
-      )
-      .subscribe()
+    function connect() {
+      // Use a stable channel name so Supabase reuses the socket slot on
+      // reconnect rather than spawning duplicate channels.
+      const ch = sb
+        .channel(`chat:${householdId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            const row = payload.new as MessageRow
+            if (row.household_id !== householdId) return   // client-side guard
+            setMessages(prev => {
+              if (prev.some(m => m.id === row.id)) return prev
+              const m = memberByIdRef.current[row.user_id] ?? null
+              const author: UserRow | null = m
+                ? { id: m.id, full_name: m.name, avatar_url: m.avatarUrl, email: '', created_at: '' } as UserRow
+                : null
+              return [...prev, { ...row, author, reactions: [] }]
+            })
+            setTimeout(() => scrollToBottom(true), 50)
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'messages' },
+          (payload) => {
+            const old = payload.old as { id: string }
+            setMessages(prev => prev.filter(m => m.id !== old.id))
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'message_reactions' },
+          (payload) => {
+            const r = payload.new as MessageReactionRow
+            setMessages(prev => prev.map(m =>
+              m.id !== r.message_id ? m : {
+                ...m,
+                reactions: m.reactions.some(x => x.id === r.id)
+                  ? m.reactions
+                  : [...m.reactions, r],
+              },
+            ))
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'message_reactions' },
+          (payload) => {
+            const old = payload.old as { id: string; message_id: string }
+            setMessages(prev => prev.map(m =>
+              m.id !== old.message_id ? m : {
+                ...m,
+                reactions: m.reactions.filter(r => r.id !== old.id),
+              },
+            ))
+          },
+        )
+        .subscribe((status) => {
+          if (cancelled) return
+          if (status === 'SUBSCRIBED') {
+            setRealtimeStatus('live')
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setRealtimeStatus('error')
+            retryTimer = setTimeout(() => {
+              if (cancelled) return
+              sb.removeChannel(ch)
+              connect()
+            }, 3_000)
+          } else {
+            setRealtimeStatus('connecting')
+          }
+        })
 
-    return () => { sb.removeChannel(channel) }
-  }, [householdId, memberById, scrollToBottom])
+      return ch
+    }
+
+    const channel = connect()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      sb.removeChannel(channel)
+    }
+  }, [householdId, scrollToBottom])   // memberById intentionally omitted — use ref
 
   // Send
   async function handleSend() {
@@ -357,6 +401,25 @@ function ChatTab({
           below its content height and let overflowY:auto scroll instead of
           pushing the input bar off screen */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px', minHeight: 0 }}>
+
+        {/* Realtime status — only visible when not connected */}
+        {realtimeStatus !== 'live' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 6, padding: '6px 12px', marginBottom: 8,
+            borderRadius: 20, border: '1px solid #E5E7EB',
+            background: '#fff', width: 'fit-content', margin: '0 auto 10px',
+            fontSize: 11, fontWeight: 700,
+            color: realtimeStatus === 'error' ? '#EF4444' : '#9CA3AF',
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+              background: realtimeStatus === 'error' ? '#EF4444' : '#F59E0B',
+              animation: 'pulse 1.5s infinite',
+            }} />
+            {realtimeStatus === 'error' ? 'Reconnecting…' : 'Connecting…'}
+          </div>
+        )}
 
         {messages.length === 0 && (
           <div style={{
