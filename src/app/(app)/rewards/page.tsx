@@ -7,8 +7,18 @@ import type { BadgeRow, UserRow, RewardsCatalogRow, RedemptionRow, HouseholdSett
 export const metadata: Metadata = { title: 'Rewards & Badges' }
 export const dynamic = 'force-dynamic'
 
-export default async function RewardsPage() {
+export default async function RewardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   const supabase = await createClient()
+  const { tab: tabParam } = await searchParams
+  const validTabs = ['my-badges', 'achievements', 'shop', 'leaderboard'] as const
+  type TabKey = typeof validTabs[number]
+  const initialTab: TabKey = (validTabs as readonly string[]).includes(tabParam ?? '')
+    ? (tabParam as TabKey)
+    : 'my-badges'
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/onboarding')
@@ -184,6 +194,7 @@ export default async function RewardsPage() {
       leaderboardHidden={leaderboardHidden}
       isAdmin={isAdmin}
       householdId={householdId}
+      initialTab={initialTab}
     />
   )
 }

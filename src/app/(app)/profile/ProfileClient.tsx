@@ -58,6 +58,7 @@ interface ProfileClientProps {
   isTopEarner:     boolean
   initialUsername: string
   initialTagline:  string
+  rewardsCount:    number
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ function initials(name: string | null) {
 export default function ProfileClient({
   user, profile, membership, householdId, members,
   streak, stats, isTopEarner,
-  initialUsername, initialTagline,
+  initialUsername, initialTagline, rewardsCount,
 }: ProfileClientProps) {
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
   const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance'>(null)
@@ -392,7 +393,12 @@ export default function ProfileClient({
           <ListRow icon="⚖️" color="amber" label="My fairness score"
             sub={stats.totalChores > 0 ? `${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''} completed` : 'No chores yet'} onClick={() => {}} />
           <ListRow icon="🎁" color="amber" label="Rewards & points"
-            sub={`${stats.totalPoints} pts available`} href="/rewards" isLast />
+            sub={
+              rewardsCount > 0
+                ? `${stats.totalPoints} pts · ${rewardsCount} reward${rewardsCount !== 1 ? 's' : ''} available`
+                : `${stats.totalPoints} pts`
+            }
+            href="/rewards?tab=shop" isLast />
         </SectionGroup>
 
         {/* ── Preferences ───────────────────────────────────────────────────── */}

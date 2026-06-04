@@ -120,6 +120,15 @@ export default async function ProfilePage() {
 
   const isTopEarner = topStreak?.user_id === user.id && totalChores > 0
 
+  // ── 6. Rewards catalog count (shown in profile row sub-text) ─────────────
+  const { count: rewardsCount } = householdId
+    ? await supabase
+        .from('rewards_catalog')
+        .select('*', { count: 'exact', head: true })
+        .eq('household_id', householdId)
+        .eq('is_active', true)
+    : { count: 0 }
+
   const profileRow = profile as UserRow
 
   return (
@@ -134,6 +143,7 @@ export default async function ProfilePage() {
       isTopEarner={isTopEarner}
       initialUsername={profileRow?.username ?? ''}
       initialTagline={profileRow?.tagline  ?? ''}
+      rewardsCount={rewardsCount ?? 0}
     />
   )
 }

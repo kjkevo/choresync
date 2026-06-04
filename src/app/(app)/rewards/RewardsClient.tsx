@@ -50,6 +50,7 @@ interface RewardsClientProps {
   leaderboardHidden:   boolean
   isAdmin:             boolean
   householdId:         string
+  initialTab:          TabKey
 }
 
 type TabKey = 'my-badges' | 'achievements' | 'shop' | 'leaderboard'
@@ -122,8 +123,9 @@ export default function RewardsClient({
   leaderboardHidden,
   isAdmin,
   householdId,
+  initialTab,
 }: RewardsClientProps) {
-  const [tab, setTab] = useState<TabKey>('my-badges')
+  const [tab, setTab] = useState<TabKey>(initialTab)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const earnedTypes = new Set(myBadges.map(b => b.badge_type as BadgeType))
@@ -441,9 +443,23 @@ function ShopTab({
 
       {/* Rewards grid */}
       {rewardsCatalog.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-          <span className="text-4xl">🛍️</span>
-          <p className="mt-3 text-sm text-slate-400">No rewards available yet.{isAdmin ? ' Add one above!' : ' Ask an admin to add some!'}</p>
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+          <span className="text-5xl">🛍️</span>
+          <p className="mt-4 font-semibold text-slate-800">No rewards yet</p>
+          <p className="mt-1 text-sm text-slate-400 max-w-xs mx-auto">
+            {isAdmin
+              ? 'Create your first reward above — household members can redeem their points for it.'
+              : 'Your household admin hasn\'t added any rewards yet. Complete chores to earn points in the meantime!'}
+          </p>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+            >
+              + Add First Reward
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
