@@ -3,9 +3,10 @@
 import React, { useRef, useState, useTransition, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import { signOut, updateProfile, uploadAvatar } from '@/lib/actions/auth'
 import { disconnectGoogleCalendar } from '@/lib/actions/google-calendar'
-import { sendInviteEmail } from '@/lib/actions/household'
+import { sendInviteEmail, createHousehold, joinHousehold } from '@/lib/actions/household'
 import BottomNav from '@/components/ui/BottomNav'
 import CustomClient from '@/app/(app)/custom/CustomClient'
 import type { UserRow } from '@/lib/types/database'
@@ -51,6 +52,13 @@ interface Membership {
 
 type GcalStatus = 'connected' | 'denied' | 'error' | 'not_configured' | null
 
+interface HouseholdSummary {
+  id:         string
+  name:       string
+  role:       'admin' | 'member' | 'kids'
+  inviteCode: string
+}
+
 interface ProfileClientProps {
   user:                    User
   profile:                 UserRow | null
@@ -65,6 +73,7 @@ interface ProfileClientProps {
   rewardsCount:            number
   googleCalendarConnected: boolean
   gcalStatus:              GcalStatus
+  allHouseholds:           HouseholdSummary[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,7 +90,9 @@ export default function ProfileClient({
   streak, stats, isTopEarner,
   initialUsername, initialTagline, rewardsCount,
   googleCalendarConnected, gcalStatus,
+  allHouseholds: initialHouseholds,
 }: ProfileClientProps) {
+  const router = useRouter()
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
   const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance'>(null)
   const [successMsg,      setSuccessMsg]     = useState<string | null>(null)
@@ -149,6 +160,62 @@ export default function ProfileClient({
         setInviteMsg({ ok: true, text: `Invite sent to ${inviteEmail.trim()}` })
         setInviteEmail('')
         setTimeout(() => { setInviteMsg(null); setInviteOpen(false) }, 3000)
+      }
+    })
+  }
+
+  // ── Multi-household management ─────────────────────────────────────────────
+  const [households,       setHouseholds]       = useState<HouseholdSummary[]>(initialHouseholds)
+  const [householdModal,   setHouseholdModal]   = useState<'create' | 'join' | null>(null)
+  const [newHouseholdName, setNewHouseholdName] = useState('')
+  const [joinCode,         setJoinCode]         = useState('')
+  const [householdPending, startHousehold]      = useTransition()
+  const [householdMsg,     setHouseholdMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+
+  function handleCreateHousehold() {
+    if (!newHouseholdName.trim()) return
+    const fd = new FormData()
+    fd.append('name', newHouseholdName.trim())
+    startHousehold(async () => {
+      const r = await createHousehold(fd)
+      if (r?.error) {
+        setHouseholdMsg({ ok: false, text: r.error })
+      } else if (r?.household) {
+        const h = r.household as { id: string; name: string; invite_code: string }
+        setHouseholds(prev => [...prev, { id: h.id, name: h.name, role: 'admin', inviteCode: h.invite_code }])
+        setHouseholdMsg({ ok: true, text: `"${h.name}" created! Redirecting…` })
+        setTimeout(() => {
+          setHouseholdModal(null)
+          setNewHouseholdName('')
+          setHouseholdMsg(null)
+          router.push(`/dashboard?h=${h.id}`)
+        }, 1200)
+      }
+    })
+  }
+
+  function handleJoinHousehold() {
+    const code = joinCode.trim().toUpperCase()
+    if (code.length !== 6) {
+      setHouseholdMsg({ ok: false, text: 'Invite codes are exactly 6 characters.' })
+      return
+    }
+    const fd = new FormData()
+    fd.append('code', code)
+    startHousehold(async () => {
+      const r = await joinHousehold(fd)
+      if (r?.error) {
+        setHouseholdMsg({ ok: false, text: r.error })
+      } else if (r?.household) {
+        const h = r.household as { id: string; name: string }
+        // Refresh page data to get the new household's invite_code etc.
+        setHouseholdMsg({ ok: true, text: `Joined "${h.name}"! Redirecting…` })
+        setTimeout(() => {
+          setHouseholdModal(null)
+          setJoinCode('')
+          setHouseholdMsg(null)
+          router.push(`/dashboard?h=${h.id}`)
+        }, 1200)
       }
     })
   }
@@ -514,14 +581,51 @@ export default function ProfileClient({
           </div>
         </SectionGroup>
 
-        {/* ── Household ─────────────────────────────────────────────────────── */}
-        {membership?.household && (
-          <SectionGroup title="Household">
-            <ListRow icon="🏠" color="blue" label="My household" sub={membership.household.name} href="/dashboard" />
+        {/* ── Households ────────────────────────────────────────────────────── */}
+        <SectionGroup title="Households">
+          {/* List every household the user belongs to */}
+          {households.map((h, i) => (
+            <a
+              key={h.id}
+              href={`/dashboard?h=${h.id}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px',
+                borderBottom: i < households.length - 1 ? '0.5px solid #F3F4F6' : 'none',
+                textDecoration: 'none',
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
+              }}>🏠</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {h.name}
+                </span>
+                <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
+                  {h.role === 'admin' ? '👑 Admin' : 'Member'}
+                  {' · '}
+                  {h.id === householdId ? 'Active' : 'Switch →'}
+                </span>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C4C4"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+          ))}
+
+          {/* Members row — only when a primary household is selected */}
+          {membership?.household && (
             <ListRow icon="👥" color="blue" label="Members"
               sub={`${members.length} member${members.length !== 1 ? 's' : ''} · you're ${membership.role}`}
               onClick={() => {}} />
-            {/* ── Invite row ────────────────────────────────────── */}
+          )}
+          {/* ── Invite row — only shown when a household exists ── */}
+          {membership?.household && (
             <div style={{ borderBottom: 'none' }}>
               {/* Header row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
@@ -614,8 +718,35 @@ export default function ProfileClient({
                 </div>
               )}
             </div>
-          </SectionGroup>
-        )}
+          )}
+
+          {/* ── Create / Join buttons ─────────────────────────────────────── */}
+          <div style={{ display: 'flex', gap: 8, padding: '12px 16px 14px' }}>
+            <button
+              type="button"
+              onClick={() => { setHouseholdModal('create'); setHouseholdMsg(null); setNewHouseholdName('') }}
+              style={{
+                flex: 1, padding: '9px 0', borderRadius: 10, border: '1.5px solid #E5E7EB',
+                background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151',
+                cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+              }}
+            >
+              + Create household
+            </button>
+            <button
+              type="button"
+              onClick={() => { setHouseholdModal('join'); setHouseholdMsg(null); setJoinCode('') }}
+              style={{
+                flex: 1, padding: '9px 0', borderRadius: 10, border: 'none',
+                background: '#FF6B2B', color: '#fff',
+                fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+              }}
+            >
+              🔑 Join with code
+            </button>
+          </div>
+        </SectionGroup>
 
         {/* ── Account & privacy ─────────────────────────────────────────────── */}
         <SectionGroup title="Account & privacy">
@@ -739,6 +870,69 @@ export default function ProfileClient({
               </div>
             </>
           )}
+        </Modal>
+      )}
+
+      {/* ── Create household modal ──────────────────────────────────────── */}
+      {householdModal === 'create' && (
+        <Modal title="Create new household" onClose={() => { setHouseholdModal(null); setHouseholdMsg(null) }}>
+          <input
+            autoFocus
+            value={newHouseholdName}
+            onChange={e => { setNewHouseholdName(e.target.value); setHouseholdMsg(null) }}
+            onKeyDown={e => e.key === 'Enter' && handleCreateHousehold()}
+            placeholder='e.g. "Sunset Apartment"'
+            maxLength={80}
+            style={INPUT_STYLE}
+          />
+          {householdMsg && (
+            <p style={{ margin: '8px 0 0', fontSize: 13, fontWeight: 700,
+              color: householdMsg.ok ? '#10B981' : '#EF4444' }}>
+              {householdMsg.text}
+            </p>
+          )}
+          <ModalBtn
+            label={householdPending ? 'Creating…' : 'Create household'}
+            disabled={!newHouseholdName.trim() || householdPending}
+            onClick={handleCreateHousehold}
+          />
+        </Modal>
+      )}
+
+      {/* ── Join household modal ─────────────────────────────────────────── */}
+      {householdModal === 'join' && (
+        <Modal title="Join a household" onClose={() => { setHouseholdModal(null); setHouseholdMsg(null) }}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>
+            Enter the 6-character invite code shared by a household member.
+          </p>
+          <input
+            autoFocus
+            value={joinCode}
+            onChange={e => { setJoinCode(e.target.value.toUpperCase().slice(0, 6)); setHouseholdMsg(null) }}
+            onKeyDown={e => e.key === 'Enter' && handleJoinHousehold()}
+            placeholder="ABC123"
+            maxLength={6}
+            style={{
+              ...INPUT_STYLE,
+              textTransform: 'uppercase',
+              letterSpacing: '0.2em',
+              textAlign: 'center',
+              fontSize: 20,
+              fontWeight: 800,
+              color: '#FF6B2B',
+            }}
+          />
+          {householdMsg && (
+            <p style={{ margin: '8px 0 0', fontSize: 13, fontWeight: 700,
+              color: householdMsg.ok ? '#10B981' : '#EF4444' }}>
+              {householdMsg.text}
+            </p>
+          )}
+          <ModalBtn
+            label={householdPending ? 'Joining…' : 'Join household'}
+            disabled={joinCode.trim().length !== 6 || householdPending}
+            onClick={handleJoinHousehold}
+          />
         </Modal>
       )}
 

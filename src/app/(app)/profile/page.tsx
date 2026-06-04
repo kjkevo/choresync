@@ -125,7 +125,34 @@ export default async function ProfilePage({
 
   const isTopEarner = topStreak?.user_id === user.id && totalChores > 0
 
-  // ── 6. Rewards catalog count (shown in profile row sub-text) ─────────────
+  // ── 6. All households the user belongs to (for multi-household section) ──
+  const { data: allMembershipRowsRaw } = await supabase
+    .from('household_members')
+    .select('household_id, role')
+    .eq('user_id', user.id)
+
+  const allMembershipRows = (allMembershipRowsRaw ?? []) as { household_id: string; role: string }[]
+  const allHouseholdIds   = allMembershipRows.map(m => m.household_id)
+
+  const { data: allHouseholdsRaw } = allHouseholdIds.length
+    ? await supabase
+        .from('households')
+        .select('id, name, invite_code')
+        .in('id', allHouseholdIds)
+    : { data: [] }
+
+  const householdById = Object.fromEntries(
+    ((allHouseholdsRaw ?? []) as { id: string; name: string; invite_code: string }[]).map(h => [h.id, h])
+  )
+
+  const allHouseholds = allMembershipRows.map(m => ({
+    id:         m.household_id,
+    name:       householdById[m.household_id]?.name       ?? 'Unknown',
+    role:       m.role                                    as 'admin' | 'member' | 'kids',
+    inviteCode: householdById[m.household_id]?.invite_code ?? '',
+  }))
+
+  // ── 7. Rewards catalog count (shown in profile row sub-text) ─────────────
   const { count: rewardsCount } = householdId
     ? await supabase
         .from('rewards_catalog')
@@ -162,6 +189,7 @@ export default async function ProfilePage({
       rewardsCount={rewardsCount ?? 0}
       googleCalendarConnected={googleCalendarConnected}
       gcalStatus={gcalStatus}
+      allHouseholds={allHouseholds}
     />
   )
 }
