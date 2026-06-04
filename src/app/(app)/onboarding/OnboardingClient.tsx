@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createHousehold, joinHousehold } from '@/lib/actions/household'
 import { createChore } from '@/lib/actions/chores'
@@ -262,7 +262,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
   async function handleFinish() {
     if (!household) return
     clearError()
-    if (!isLoggedIn) { setStep('success'); return }   // preview bypass
+    if (!isLoggedIn) { router.push('/dashboard'); return }   // preview bypass — skip success, go straight to dashboard
     startTransition(async () => {
       for (const chore of chores) {
         const name = chore.name.trim()
@@ -1266,6 +1266,48 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
 
           {/* ── SUCCESS ─────────────────────────────────────────────────────── */}
           {step === 'success' && household && (
+            <SuccessScreen
+              household={household}
+              router={router}
+            />
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SuccessScreen({
+  household,
+  router,
+}: {
+  household: { id: string; name: string; invite_code: string }
+  router:    ReturnType<typeof useRouter>
+}) {
+  const [copied, setCopied] = useState(false)
+  const [countdown, setCountdown] = useState(3)
+
+  // Auto-redirect to dashboard after 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) {
+          clearInterval(interval)
+          router.push('/dashboard')
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [router])
+
+  function copyCode() {
+    navigator.clipboard?.writeText(household.invite_code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
               <h2 style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 800, fontSize: 24, color: '#111827', margin: '0 0 8px' }}>
@@ -1329,13 +1371,9 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                 onClick={() => router.push('/dashboard')}
                 style={primaryBtn(false)}
               >
-                Go to Dashboard →
+                Go to Dashboard → {countdown > 0 && `(${countdown})`}
               </button>
             </div>
-          )}
-        </div>
-      </div>
-    </>
   )
 }
 
