@@ -49,7 +49,7 @@ export default async function HouseholdPage() {
 
   const { data: profiles } = await supabase
     .from('users')
-    .select('id, full_name, avatar_url, email, username, tagline, created_at, updated_at')
+    .select('id, full_name, avatar_url, email, username, tagline, google_calendar_refresh_token, created_at, updated_at')
     .in('id', memberIds)
 
   // Zip memberships + profiles together into enriched members
@@ -58,14 +58,15 @@ export default async function HouseholdPage() {
   const members: (HouseholdMember & { user: UserRow })[] = (memberships ?? []).map(m => ({
     ...m,
     user: profileMap[m.user_id] ?? {
-      id:         m.user_id,
-      email:      '',
-      full_name:  null,
-      avatar_url: null,
-      username:   null,
-      tagline:    null,
-      created_at: '',
-      updated_at: '',
+      id:                            m.user_id,
+      email:                         '',
+      full_name:                     null,
+      avatar_url:                    null,
+      username:                      null,
+      tagline:                       null,
+      google_calendar_refresh_token: null,
+      created_at:                    '',
+      updated_at:                    '',
     },
   }))
 

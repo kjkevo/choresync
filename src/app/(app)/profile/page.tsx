@@ -7,9 +7,14 @@ import type { UserRow } from '@/lib/types/database'
 export const metadata: Metadata = { title: 'Profile' }
 export const dynamic = 'force-dynamic'
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gcal?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const { gcal } = await searchParams
 
   // No session → onboarding (middleware handles this first, but be defensive)
   if (!user) redirect('/onboarding')
@@ -130,6 +135,17 @@ export default async function ProfilePage() {
     : { count: 0 }
 
   const profileRow = profile as UserRow
+  const googleCalendarConnected = !!profileRow?.google_calendar_refresh_token
+
+  // Map the ?gcal= query param coming back from the OAuth callback
+  // into a typed status the client can render as a toast.
+  type GcalStatus = 'connected' | 'denied' | 'error' | 'not_configured' | null
+  const gcalStatus: GcalStatus =
+    gcal === 'connected'      ? 'connected'      :
+    gcal === 'denied'         ? 'denied'         :
+    gcal === 'error'          ? 'error'          :
+    gcal === 'not_configured' ? 'not_configured' :
+    null
 
   return (
     <ProfileClient
@@ -144,6 +160,8 @@ export default async function ProfilePage() {
       initialUsername={profileRow?.username ?? ''}
       initialTagline={profileRow?.tagline  ?? ''}
       rewardsCount={rewardsCount ?? 0}
+      googleCalendarConnected={googleCalendarConnected}
+      gcalStatus={gcalStatus}
     />
   )
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useRef, useState, useTransition, useEffect } from 'react'
+import React, { useRef, useState, useTransition, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { signOut, updateProfile, uploadAvatar } from '@/lib/actions/auth'
+import { disconnectGoogleCalendar } from '@/lib/actions/google-calendar'
 import BottomNav from '@/components/ui/BottomNav'
 import CustomClient from '@/app/(app)/custom/CustomClient'
 import type { UserRow } from '@/lib/types/database'
@@ -47,18 +48,22 @@ interface Membership {
   household:   { id: string; name: string; invite_code: string } | null
 }
 
+type GcalStatus = 'connected' | 'denied' | 'error' | 'not_configured' | null
+
 interface ProfileClientProps {
-  user:            User
-  profile:         UserRow | null
-  membership:      Membership | null
-  householdId:     string | null
-  members:         UserRow[]
-  streak:          { current_streak: number; total_completions: number } | null
-  stats:           ProfileStats
-  isTopEarner:     boolean
-  initialUsername: string
-  initialTagline:  string
-  rewardsCount:    number
+  user:                    User
+  profile:                 UserRow | null
+  membership:              Membership | null
+  householdId:             string | null
+  members:                 UserRow[]
+  streak:                  { current_streak: number; total_completions: number } | null
+  stats:                   ProfileStats
+  isTopEarner:             boolean
+  initialUsername:         string
+  initialTagline:          string
+  rewardsCount:            number
+  googleCalendarConnected: boolean
+  gcalStatus:              GcalStatus
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -74,6 +79,7 @@ export default function ProfileClient({
   user, profile, membership, householdId, members,
   streak, stats, isTopEarner,
   initialUsername, initialTagline, rewardsCount,
+  googleCalendarConnected, gcalStatus,
 }: ProfileClientProps) {
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
   const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance'>(null)
@@ -90,6 +96,33 @@ export default function ProfileClient({
   const [username,   setUsername]   = useState(initialUsername)
   // Appearance is a local-only display preference (no DB column needed)
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system')
+
+  // Google Calendar connection state
+  const [gcalConnected,      setGcalConnected]      = useState(googleCalendarConnected)
+  const [gcalToast,          setGcalToast]          = useState<string | null>(null)
+  const [isDisconnectingGcal, startGcalDisconnect]  = useTransition()
+
+  const showGcalToast = useCallback((msg: string) => {
+    setGcalToast(msg)
+    setTimeout(() => setGcalToast(null), 4000)
+  }, [])
+
+  // Show feedback after returning from the OAuth callback
+  useEffect(() => {
+    if (gcalStatus === 'connected')      showGcalToast('✅ Google Calendar connected!')
+    if (gcalStatus === 'denied')         showGcalToast('Google sign-in was cancelled.')
+    if (gcalStatus === 'error')          showGcalToast('❌ Something went wrong. Please try again.')
+    if (gcalStatus === 'not_configured') showGcalToast('⚙️ Google Calendar not yet configured — coming soon.')
+  }, [gcalStatus, showGcalToast])
+
+  function handleDisconnectGcal() {
+    setGcalConnected(false)
+    startGcalDisconnect(async () => {
+      const r = await disconnectGoogleCalendar()
+      if (r?.error) { setGcalConnected(true); showGcalToast('❌ ' + r.error) }
+      else showGcalToast('Google Calendar disconnected.')
+    })
+  }
 
   // Avatar / color
   const [selectedColor, setSelectedColor] = useState(membership?.color_theme ?? '#FF6B2B')
@@ -408,7 +441,54 @@ export default function ProfileClient({
             sub={appearance === 'system' ? 'System default' : appearance === 'dark' ? 'Dark mode' : 'Light mode'}
             onClick={() => openEdit('appearance')} />
           <ListRow icon="🌐" color="teal" label="Language & region" sub="English · US" onClick={() => {}} />
-          <ListRow icon="📅" color="teal" label="Calendar sync" sub="Coming soon" onClick={() => {}} isLast />
+          {/* Calendar sync — real Google OAuth row */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 16px',
+            borderBottom: 'none',
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              background: ICON_BG.teal.bg, color: ICON_BG.teal.fg,
+            }}>📅</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600 }}>
+                Calendar sync
+              </span>
+              <span style={{ fontSize: 12, display: 'block', marginTop: 1, color: gcalConnected ? '#10B981' : '#9CA3AF' }}>
+                {gcalConnected ? '✓ Connected to Google Calendar' : 'Sync chores with Google Calendar'}
+              </span>
+            </div>
+            {gcalConnected ? (
+              <button
+                type="button"
+                onClick={handleDisconnectGcal}
+                disabled={isDisconnectingGcal}
+                style={{
+                  flexShrink: 0, padding: '5px 12px', borderRadius: 8,
+                  border: '1.5px solid #E5E7EB', background: '#fff',
+                  fontSize: 12, fontWeight: 700, color: '#6B7280',
+                  cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                  opacity: isDisconnectingGcal ? 0.5 : 1,
+                }}
+              >
+                {isDisconnectingGcal ? 'Removing…' : 'Disconnect'}
+              </button>
+            ) : (
+              <a
+                href="/api/auth/google-calendar"
+                style={{
+                  flexShrink: 0, padding: '5px 12px', borderRadius: 8,
+                  border: 'none', background: '#FF6B2B', color: '#fff',
+                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
+                  fontFamily: '"Nunito", sans-serif', display: 'inline-block',
+                }}
+              >
+                Connect
+              </a>
+            )}
+          </div>
         </SectionGroup>
 
         {/* ── Household ─────────────────────────────────────────────────────── */}
@@ -553,6 +633,20 @@ export default function ProfileClient({
             </>
           )}
         </Modal>
+      )}
+
+      {/* Google Calendar OAuth toast */}
+      {gcalToast && (
+        <div style={{
+          position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 100, background: '#111827', color: '#fff',
+          borderRadius: 12, padding: '11px 20px',
+          fontSize: 13, fontWeight: 700, fontFamily: '"Nunito", sans-serif',
+          whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+          pointerEvents: 'none',
+        }}>
+          {gcalToast}
+        </div>
       )}
 
       <BottomNav />

@@ -15,6 +15,7 @@ export interface Database {
           avatar_url: string | null
           username: string | null
           tagline: string | null
+          google_calendar_refresh_token: string | null
           created_at: string
           updated_at: string
         }
@@ -25,6 +26,7 @@ export interface Database {
           avatar_url?: string | null
           username?: string | null
           tagline?: string | null
+          google_calendar_refresh_token?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -33,6 +35,7 @@ export interface Database {
           avatar_url?: string | null
           username?: string | null
           tagline?: string | null
+          google_calendar_refresh_token?: string | null
           updated_at?: string
         }
         Relationships: []
