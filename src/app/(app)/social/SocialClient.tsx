@@ -849,18 +849,42 @@ function AnnouncementsTab({
 
           {announcements.length === 0 && !composing && (
             <div style={{
-              borderRadius: 16, border: '2px dashed #E5E7EB',
-              background: '#fff', padding: '56px 24px',
+              borderRadius: 20, border: '2px dashed #E5E7EB',
+              background: '#fff', padding: '48px 28px 40px',
               textAlign: 'center',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
             }}>
-              <div style={{ fontSize: 40 }}>📌</div>
-              <p style={{ marginTop: 12, fontWeight: 700, color: '#374151', fontSize: 15 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: '#FFF3EE',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 28,
+              }}>
+                📌
+              </div>
+              <p style={{ marginTop: 16, fontWeight: 800, color: '#111827', fontSize: 16, margin: '16px 0 0', fontFamily: '"Poppins", sans-serif' }}>
                 No announcements yet
               </p>
+              <p style={{ marginTop: 6, fontSize: 13, color: '#9CA3AF', lineHeight: 1.5, maxWidth: 240, margin: '8px auto 0' }}>
+                {isAdmin
+                  ? 'Post important updates to keep the household informed.'
+                  : 'Admins can post important updates here for the household.'}
+              </p>
               {isAdmin && (
-                <p style={{ marginTop: 4, fontSize: 13, color: '#9CA3AF' }}>
-                  Post important messages to keep the household informed.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setComposing(true)}
+                  style={{
+                    marginTop: 20,
+                    padding: '11px 28px', borderRadius: 12, border: 'none',
+                    background: ORANGE, color: '#fff',
+                    fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                    fontFamily: '"Nunito", sans-serif',
+                    boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+                  }}
+                >
+                  📣 Post Announcement
+                </button>
               )}
             </div>
           )}
