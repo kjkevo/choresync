@@ -120,7 +120,8 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
   const [expandedChore, setExpandedChore] = useState(0)
 
   // Rotation
-  const [rotationType, setRotationType] = useState<'manual' | 'round-robin' | 'random'>('round-robin')
+  const [rotationType, setRotationType]   = useState<'admin-approval' | 'ai-detection' | 'manual-completion'>('manual-completion')
+  const [rotationOrder, setRotationOrder] = useState<string[]>([])
 
   // Join
   const [joinCode, setJoinCode] = useState('')
@@ -610,7 +611,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                 type="button"
                 onClick={handleCreateRoom}
                 disabled={isPending || !roomName.trim()}
-                style={primaryBtn(isPending || roomName.trim().length < 2)}
+                style={primaryBtn(isPending || !roomName.trim())}
               >
                 {isPending ? 'Creating…' : 'Continue →'}
               </button>
@@ -715,6 +716,68 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                   color: '#D1D5DB', fontSize: 13, marginBottom: 16,
                 }}>
                   No housemates added yet — you can also skip this and invite later.
+                </div>
+              )}
+
+              {/* Invite link card — shown once household exists */}
+              {household && (
+                <div style={{
+                  background: '#FFF8F5', border: '1.5px dashed #FFB899',
+                  borderRadius: 14, padding: '14px 16px', marginBottom: 14,
+                }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, color: '#FF6B2B', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    📨 Invite housemates
+                  </p>
+                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>
+                    Share this link or code — they can join from any device.
+                  </p>
+                  {/* Code pill */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{
+                      fontFamily: 'monospace', fontSize: 20, fontWeight: 900,
+                      letterSpacing: '0.25em', color: '#FF6B2B',
+                      background: '#fff', border: '1.5px solid #FFD5C2',
+                      borderRadius: 8, padding: '4px 12px', flex: 1, textAlign: 'center',
+                    }}>
+                      {household.invite_code}
+                    </span>
+                  </div>
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/join/${household.invite_code}`
+                        navigator.clipboard?.writeText(url)
+                      }}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 10,
+                        border: '1.5px solid #E5E7EB', background: '#fff',
+                        fontSize: 12, fontWeight: 700, color: '#374151',
+                        cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                      }}
+                    >
+                      🔗 Copy Link
+                    </button>
+                    {'share' in navigator && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.share?.({
+                          title: `Join ${household.name} on ChoreSync`,
+                          text: `Use code ${household.invite_code} to join my household`,
+                          url: `${window.location.origin}/join/${household.invite_code}`,
+                        })}
+                        style={{
+                          flex: 1, padding: '8px 0', borderRadius: 10,
+                          border: 'none', background: '#FF6B2B', color: '#fff',
+                          fontSize: 12, fontWeight: 700,
+                          cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                        }}
+                      >
+                        📤 Share
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -935,22 +998,6 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                           <div>
                             <label style={labelStyle}>Assign to</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {/* Rotate option */}
-                              <button
-                                type="button"
-                                onClick={() => updateChore(i, { assignTo: 'rotate' })}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: 10,
-                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                                  border: `2px solid ${chore.assignTo === 'rotate' ? '#FF6B2B' : '#E5E7EB'}`,
-                                  background: chore.assignTo === 'rotate' ? '#FFF3EE' : '#fff',
-                                  textAlign: 'left',
-                                }}
-                              >
-                                <span style={{ fontSize: 18 }}>🔄</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Rotate (everyone takes turns)</span>
-                              </button>
-
                               {/* Me option */}
                               <button
                                 type="button"
@@ -1048,34 +1095,40 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                 How should chores rotate between household members over time?
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {[
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {([
                   {
-                    id: 'round-robin' as const,
-                    emoji: '🔄',
-                    title: 'Round Robin',
-                    desc: 'Chores automatically cycle to the next person each week. Fair and predictable.',
+                    id: 'manual-completion' as const,
+                    emoji: '✅',
+                    title: 'Manual Completion',
+                    desc: 'Each person checks off their own chore. The chore automatically moves to the next person in the rotation — no double-assignments until everyone has had a turn.',
                     badge: 'Recommended',
                   },
                   {
-                    id: 'manual' as const,
-                    emoji: '✋',
-                    title: 'Manual assignment',
-                    desc: 'You (the admin) assign each chore to specific people. Full control.',
+                    id: 'admin-approval' as const,
+                    emoji: '👑',
+                    title: "Admin's Word",
+                    desc: 'Members submit a photo when done. You (the admin) approve or decline each completion. You also control who is next in the rotation.',
                     badge: null,
                   },
                   {
-                    id: 'random' as const,
-                    emoji: '🎲',
-                    title: 'Random',
-                    desc: 'Chores are randomly assigned each week. Keeps things unpredictable.',
-                    badge: null,
+                    id: 'ai-detection' as const,
+                    emoji: '🤖',
+                    title: 'AI Completion Detection',
+                    desc: 'Members submit a photo and AI automatically checks whether the chore was done correctly. Instant, objective, no admin required.',
+                    badge: 'Beta',
                   },
-                ].map(opt => (
+                ] as const).map(opt => (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setRotationType(opt.id)}
+                    onClick={() => {
+                      setRotationType(opt.id)
+                      // Seed rotation order from current member list
+                      if (opt.id === 'admin-approval' && rotationOrder.length === 0) {
+                        setRotationOrder([adminName.split(' ')[0], ...members.map(m => m.name.split(' ')[0])])
+                      }
+                    }}
                     style={{
                       position: 'relative', textAlign: 'left',
                       background: rotationType === opt.id ? '#FFF3EE' : '#fff',
@@ -1090,7 +1143,9 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                       <span style={{
                         position: 'absolute', top: 12, right: 12,
                         fontSize: 10, fontWeight: 700, padding: '2px 8px',
-                        borderRadius: 99, background: '#EAF3DE', color: '#27500A',
+                        borderRadius: 99,
+                        background: opt.badge === 'Beta' ? '#EEF2FF' : '#EAF3DE',
+                        color: opt.badge === 'Beta' ? '#4338CA' : '#27500A',
                       }}>
                         {opt.badge}
                       </span>
@@ -1110,20 +1165,74 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                 ))}
               </div>
 
+              {/* Rotation order — only for Admin's Word */}
+              {rotationType === 'admin-approval' && (() => {
+                const order = rotationOrder.length > 0
+                  ? rotationOrder
+                  : [adminName.split(' ')[0], ...members.map(m => m.name.split(' ')[0])]
+
+                function move(idx: number, dir: -1 | 1) {
+                  const next = [...order]
+                  const swap = idx + dir
+                  if (swap < 0 || swap >= next.length) return
+                  ;[next[idx], next[swap]] = [next[swap], next[idx]]
+                  setRotationOrder(next)
+                }
+
+                return (
+                  <div style={{
+                    background: '#F9FAFB', borderRadius: 14, padding: '14px 16px',
+                    marginBottom: 16, border: '1.5px solid #E5E7EB',
+                  }}>
+                    <p style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+                      Rotation order — drag to reorder
+                    </p>
+                    {order.map((name, idx) => (
+                      <div key={name} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 0',
+                        borderBottom: idx < order.length - 1 ? '0.5px solid #E5E7EB' : 'none',
+                      }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#D1D5DB', width: 18, textAlign: 'center' }}>
+                          {idx + 1}
+                        </span>
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#111827' }}>{name}</span>
+                        {idx === 0 && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FFF3EE', color: '#FF6B2B' }}>
+                            Up next
+                          </span>
+                        )}
+                        <div style={{ display: 'flex', gap: 2 }}>
+                          <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0}
+                            style={{ background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, width: 26, height: 26, cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#D1D5DB' : '#6B7280', fontSize: 12 }}>
+                            ↑
+                          </button>
+                          <button type="button" onClick={() => move(idx, 1)} disabled={idx === order.length - 1}
+                            style={{ background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, width: 26, height: 26, cursor: idx === order.length - 1 ? 'default' : 'pointer', color: idx === order.length - 1 ? '#D1D5DB' : '#6B7280', fontSize: 12 }}>
+                            ↓
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
               {/* Preview */}
-              {chores.length > 0 && members.length > 0 && (
+              {chores.length > 0 && (
                 <div style={{
                   background: '#F9FAFB', borderRadius: 14, padding: '14px 16px',
                   marginBottom: 20, border: '1.5px solid #E5E7EB',
                 }}>
                   <p style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase', margin: '0 0 10px' }}>
-                    Preview — Week 1
+                    {rotationType === 'manual-completion' ? 'Auto-rotation preview' : rotationType === 'admin-approval' ? 'First cycle preview' : 'AI verification preview'}
                   </p>
                   {chores.slice(0, 4).map((chore, i) => {
-                    const allPeople = [adminName.split(' ')[0], ...members.map(m => m.name.split(' ')[0])]
-                    const person = rotationType === 'random'
-                      ? allPeople[Math.floor(Math.random() * allPeople.length)]
-                      : allPeople[i % allPeople.length]
+                    const allPeople = rotationOrder.length > 0
+                      ? rotationOrder
+                      : [adminName.split(' ')[0], ...members.map(m => m.name.split(' ')[0])]
+                    const person = allPeople.length > 0 ? allPeople[i % allPeople.length] : '—'
+                    const suffix = rotationType === 'ai-detection' ? ' 📸' : rotationType === 'admin-approval' ? ' 👑' : ''
                     return (
                       <div key={i} style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1131,7 +1240,7 @@ export default function OnboardingClient({ displayName, isLoggedIn }: { displayN
                       }}>
                         <span style={{ fontSize: 13, color: '#374151' }}>{chore.emoji} {chore.name}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B2B' }}>
-                          {rotationType === 'manual' ? (chore.assignTo === 'me' ? adminName.split(' ')[0] : chore.assignTo === 'rotate' ? '—' : chore.assignTo) : person}
+                          {person}{suffix}
                         </span>
                       </div>
                     )
