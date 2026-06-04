@@ -95,9 +95,16 @@ export default async function ProfilePage() {
       : Promise.resolve({ data: [] }),
   ])
 
-  const totalChores = (completions ?? []).length
-  const onTimeCount = (completions ?? []).filter(c => c.was_on_time).length
-  const onTimeRate  = totalChores > 0 ? Math.round((onTimeCount / totalChores) * 100) : 0
+  const allCompletions  = (completions ?? []) as { was_on_time: boolean | null }[]
+  const totalChores     = allCompletions.length
+  // Only score on-time rate against completions that had a due date.
+  // Chores without a due date have was_on_time = null and should not
+  // drag the percentage down or skew it in either direction.
+  const datedCompletions = allCompletions.filter(c => c.was_on_time !== null)
+  const onTimeCount      = datedCompletions.filter(c => c.was_on_time === true).length
+  const onTimeRate: number | null = datedCompletions.length > 0
+    ? Math.round((onTimeCount / datedCompletions.length) * 100)
+    : null   // null = no dated chores yet → show "—" in UI
   const totalPoints = ((pointEventsRaw ?? []) as { points: number }[]).reduce((s, r) => s + r.points, 0)
 
   // ── 5. Top earner? ────────────────────────────────────────────────────────

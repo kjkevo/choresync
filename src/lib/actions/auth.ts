@@ -119,17 +119,20 @@ export async function updateProfile(formData: FormData) {
     if (metaError) return { error: metaError.message }
   }
 
-  // 2. Write all changed fields to public.users in one round-trip
+  // 2. Write all changed fields to public.users in one round-trip.
+  // Only include a field in the patch when it was explicitly submitted in the
+  // FormData — callers that only update name/avatar must not accidentally clear
+  // username/tagline by omitting them.
   const patch: {
     full_name?:  string | null
     avatar_url?: string | null
     username?:   string | null
     tagline?:    string | null
   } = {}
-  if (fullName  !== null) patch.full_name  = fullName
-  if (avatarUrl !== null) patch.avatar_url = avatarUrl
-  patch.username = username   // null clears it
-  patch.tagline  = tagline    // null clears it
+  if (fullName  !== null)          patch.full_name  = fullName
+  if (avatarUrl !== null)          patch.avatar_url = avatarUrl
+  if (formData.has('username'))    patch.username   = username   // null = clear
+  if (formData.has('tagline'))     patch.tagline    = tagline    // null = clear
 
   if (Object.keys(patch).length > 0) {
     const { error: dbError } = await supabase

@@ -37,7 +37,7 @@ const ICON_BG: Record<string, { bg: string; fg: string }> = {
 
 interface ProfileStats {
   totalChores: number
-  onTimeRate:  number
+  onTimeRate:  number | null   // null when no chores have a due date
   totalPoints: number
 }
 
@@ -343,12 +343,16 @@ export default function ProfileClient({
         {/* Stats bar */}
         <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
           {[
-            { num: stats.totalChores,      label: 'Chores done'  },
-            { num: `${stats.onTimeRate}%`, label: 'On-time rate' },
-            { num: stats.totalPoints,      label: 'Points'       },
+            { num: stats.totalChores,
+              label: 'Chores done' },
+            { num: stats.onTimeRate !== null ? `${stats.onTimeRate}%` : '—',
+              label: 'On-time rate',
+              dim: stats.onTimeRate === null },
+            { num: stats.totalPoints,
+              label: 'Points' },
           ].map((s, i) => (
             <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 2 ? '0.5px solid #E5E7EB' : 'none' }}>
-              <span style={{ fontSize: 19, fontWeight: 700, color: '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
+              <span style={{ fontSize: 19, fontWeight: 700, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
                 {s.num}
               </span>
               <span style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginTop: 2 }}>{s.label}</span>
