@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { signOut, updateProfile, uploadAvatar } from '@/lib/actions/auth'
 import { disconnectGoogleCalendar } from '@/lib/actions/google-calendar'
+import { sendInviteEmail } from '@/lib/actions/household'
 import BottomNav from '@/components/ui/BottomNav'
 import CustomClient from '@/app/(app)/custom/CustomClient'
 import type { UserRow } from '@/lib/types/database'
@@ -88,7 +89,6 @@ export default function ProfileClient({
   const [isPending,       startTransition]   = useTransition()
   const [isSigningOut,    startSignOut]      = useTransition()
   const [uploadingAvatar, setUploading]      = useState(false)
-  const [copied,          setCopied]         = useState(false)
   const [avatarTab,       setAvatarTab]      = useState<'emoji' | 'photo' | 'color'>('emoji')
 
   // Profile fields — seeded from DB via props, updated optimistically on save
@@ -121,6 +121,35 @@ export default function ProfileClient({
       const r = await disconnectGoogleCalendar()
       if (r?.error) { setGcalConnected(true); showGcalToast('❌ ' + r.error) }
       else showGcalToast('Google Calendar disconnected.')
+    })
+  }
+
+  // Invite by email
+  const [inviteEmail,      setInviteEmail]      = useState('')
+  const [inviteOpen,       setInviteOpen]        = useState(false)
+  const [inviteSending,    startInviteSend]      = useTransition()
+  const [inviteMsg,        setInviteMsg]         = useState<{ ok: boolean; text: string } | null>(null)
+  const [linkCopied,       setLinkCopied]        = useState(false)
+
+  function handleCopyLink() {
+    const code = membership?.household?.invite_code ?? ''
+    const url  = `${window.location.origin}/join/${code}`
+    navigator.clipboard?.writeText(url)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  function handleSendInvite() {
+    if (!inviteEmail.trim() || !membership?.household?.id) return
+    startInviteSend(async () => {
+      const r = await sendInviteEmail(membership!.household!.id, inviteEmail.trim())
+      if (r?.error) {
+        setInviteMsg({ ok: false, text: r.error })
+      } else {
+        setInviteMsg({ ok: true, text: `Invite sent to ${inviteEmail.trim()}` })
+        setInviteEmail('')
+        setTimeout(() => { setInviteMsg(null); setInviteOpen(false) }, 3000)
+      }
     })
   }
 
@@ -229,12 +258,6 @@ export default function ProfileClient({
     const supabase = createClient()
     await supabase.from('household_members').update({ color_theme: color }).eq('user_id', user.id)
     setSuccessMsg('Color updated!')
-  }
-
-  function handleCopyInviteCode() {
-    navigator.clipboard?.writeText(membership?.household?.invite_code ?? '')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   function handleSignOut() { startSignOut(() => signOut()) }
@@ -498,15 +521,99 @@ export default function ProfileClient({
             <ListRow icon="👥" color="blue" label="Members"
               sub={`${members.length} member${members.length !== 1 ? 's' : ''} · you're ${membership.role}`}
               onClick={() => {}} />
-            <ListRow icon="🔗" color="blue" label="Invite someone"
-              sub={`Code: ${membership.household.invite_code}`}
-              onClick={handleCopyInviteCode}
-              right={
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B2B', background: '#FFF3EE', borderRadius: 8, padding: '3px 10px' }}>
-                  {copied ? '✓ Copied' : 'Copy'}
-                </span>
-              }
-              isLast noChevron />
+            {/* ── Invite row ────────────────────────────────────── */}
+            <div style={{ borderBottom: 'none' }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                  background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
+                }}>🔗</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600 }}>
+                    Invite someone
+                  </span>
+                  <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
+                    Code: <strong style={{ color: '#FF6B2B', letterSpacing: '0.06em' }}>
+                      {membership.household.invite_code}
+                    </strong>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    style={{
+                      padding: '5px 10px', borderRadius: 8,
+                      border: '1.5px solid #E5E7EB', background: '#fff',
+                      fontSize: 11, fontWeight: 700, color: '#6B7280',
+                      cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                    }}
+                  >
+                    {linkCopied ? '✓ Link' : '🔗 Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setInviteOpen(o => !o); setInviteMsg(null) }}
+                    style={{
+                      padding: '5px 10px', borderRadius: 8,
+                      border: 'none', background: '#FF6B2B', color: '#fff',
+                      fontSize: 11, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                    }}
+                  >
+                    ✉️ Email
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible email form */}
+              {inviteOpen && (
+                <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSendInvite()}
+                      placeholder="friend@email.com"
+                      style={{
+                        flex: 1, padding: '9px 13px', borderRadius: 10,
+                        border: '1.5px solid #E5E7EB', background: '#F7F8FA',
+                        fontSize: 13, color: '#111827',
+                        fontFamily: '"Nunito", sans-serif', outline: 'none',
+                      }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#FF6B2B' }}
+                      onBlur={e =>  { e.currentTarget.style.borderColor = '#E5E7EB' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendInvite}
+                      disabled={!inviteEmail.trim() || inviteSending}
+                      style={{
+                        padding: '9px 16px', borderRadius: 10, border: 'none',
+                        background: inviteEmail.trim() && !inviteSending ? '#FF6B2B' : '#E5E7EB',
+                        color: inviteEmail.trim() && !inviteSending ? '#fff' : '#9CA3AF',
+                        fontSize: 13, fontWeight: 700,
+                        cursor: inviteEmail.trim() && !inviteSending ? 'pointer' : 'default',
+                        fontFamily: '"Nunito", sans-serif', flexShrink: 0,
+                      }}
+                    >
+                      {inviteSending ? 'Sending…' : 'Send'}
+                    </button>
+                  </div>
+                  {inviteMsg && (
+                    <p style={{
+                      margin: 0, fontSize: 12, fontWeight: 700,
+                      color: inviteMsg.ok ? '#10B981' : '#EF4444',
+                    }}>
+                      {inviteMsg.ok ? '✓ ' : '✕ '}{inviteMsg.text}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </SectionGroup>
         )}
 

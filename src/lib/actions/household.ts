@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,182 @@ export async function regenerateInviteCode(householdId: string) {
   }
 
   return { error: 'Could not generate a unique code. Please try again.' }
+}
+
+// ─── Send invite email ────────────────────────────────────────────────────────
+
+/**
+ * Send an email invitation to join the household.
+ * Uses Resend (RESEND_API_KEY env var). Works for any household member —
+ * not admin-only, since any member can invite someone they know.
+ */
+export async function sendInviteEmail(householdId: string, recipientEmail: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated.' }
+
+  // Validate email format
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRe.test(recipientEmail.trim())) {
+    return { error: 'Please enter a valid email address.' }
+  }
+
+  // Verify sender is a member of this household
+  const { data: membership } = await supabase
+    .from('household_members')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .eq('household_id', householdId)
+    .maybeSingle()
+
+  if (!membership) return { error: 'You are not a member of this household.' }
+
+  // Fetch household name + invite code
+  const { data: household } = await supabase
+    .from('households')
+    .select('name, invite_code')
+    .eq('id', householdId)
+    .maybeSingle()
+
+  if (!household) return { error: 'Household not found.' }
+
+  // Fetch sender's display name
+  const { data: senderProfile } = await supabase
+    .from('users')
+    .select('full_name, email')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const senderName = (senderProfile as { full_name: string | null; email: string } | null)
+    ?.full_name ?? user.email ?? 'Your housemate'
+
+  const siteUrl   = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
+  const joinUrl   = `${siteUrl}/join/${household.invite_code}`
+  const apiKey    = process.env.RESEND_API_KEY
+
+  if (!apiKey) return { error: 'Email service not configured. Share your invite link manually.' }
+
+  const resend = new Resend(apiKey)
+
+  const { error: sendError } = await resend.emails.send({
+    from:    'ChoreSync <help@choresync.com>',
+    to:      [recipientEmail.trim()],
+    subject: `${senderName} invited you to join ${household.name} on ChoreSync`,
+    html:    buildInviteEmail({
+      senderName,
+      householdName: household.name,
+      inviteCode:    household.invite_code,
+      joinUrl,
+    }),
+  })
+
+  if (sendError) {
+    console.error('Resend error:', sendError)
+    return { error: 'Failed to send the invite email. Please try again.' }
+  }
+
+  return { success: true }
+}
+
+// ── Email template ────────────────────────────────────────────────────────────
+
+function buildInviteEmail({
+  senderName,
+  householdName,
+  inviteCode,
+  joinUrl,
+}: {
+  senderName:    string
+  householdName: string
+  inviteCode:    string
+  joinUrl:       string
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You're invited to join ${householdName}</title>
+</head>
+<body style="margin:0;padding:0;background:#F7F8FA;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8FA;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#FF6B2B,#FF8C5A);padding:36px 40px 28px;text-align:center;">
+              <div style="font-size:36px;margin-bottom:8px;">🏠</div>
+              <p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">
+                You're invited!
+              </p>
+              <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.85);">
+                Join <strong>${householdName}</strong> on ChoreSync
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 40px;">
+              <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+                Hey there! <strong>${senderName}</strong> has invited you to join their household
+                <strong>${householdName}</strong> on ChoreSync — the app that makes sharing chores
+                fair and stress-free.
+              </p>
+
+              <!-- Invite code pill -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+                <tr>
+                  <td style="background:#FFF3EE;border:2px dashed #FFB899;border-radius:14px;padding:20px;text-align:center;">
+                    <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#FF6B2B;text-transform:uppercase;letter-spacing:0.08em;">
+                      Your invite code
+                    </p>
+                    <p style="margin:0;font-size:32px;font-weight:800;color:#FF6B2B;letter-spacing:0.15em;">
+                      ${inviteCode}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA button -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:4px 0 24px;">
+                    <a href="${joinUrl}"
+                       style="display:inline-block;background:#FF6B2B;color:#ffffff;text-decoration:none;
+                              font-size:16px;font-weight:700;padding:14px 40px;border-radius:12px;
+                              box-shadow:0 4px 14px rgba(255,107,43,0.35);">
+                      Accept Invitation →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:13px;color:#9CA3AF;line-height:1.6;">
+                Or open ChoreSync and enter the code above manually. The link and code never expire —
+                share it whenever you're ready.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#F9FAFB;border-top:1px solid #F0F0F0;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9CA3AF;">
+                Sent by ChoreSync on behalf of ${senderName}.
+                If you weren't expecting this, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 }
 
 // ─── Member role ──────────────────────────────────────────────────────────────
