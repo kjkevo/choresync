@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { href: '/calendar',  label: '📅'       },
   { href: '/social',    label: '💬'       },
   { href: '/history',   label: '📊'       },
-  { href: '/rewards',   label: '🏆'       },
   { href: '/supplies',  label: '🛒', active: true },
   { href: '/household', label: 'House'    },
   { href: '/settings',  label: '⚙️'       },

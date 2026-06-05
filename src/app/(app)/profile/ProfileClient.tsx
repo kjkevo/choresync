@@ -70,7 +70,6 @@ interface ProfileClientProps {
   isTopEarner:             boolean
   initialUsername:         string
   initialTagline:          string
-  rewardsCount:            number
   googleCalendarConnected: boolean
   gcalStatus:              GcalStatus
   allHouseholds:           HouseholdSummary[]
@@ -88,7 +87,7 @@ function initials(name: string | null) {
 export default function ProfileClient({
   user, profile, membership, householdId, members,
   streak, stats, isTopEarner,
-  initialUsername, initialTagline, rewardsCount,
+  initialUsername, initialTagline,
   googleCalendarConnected, gcalStatus,
   allHouseholds: initialHouseholds,
 }: ProfileClientProps) {
@@ -514,14 +513,7 @@ export default function ProfileClient({
           <ListRow icon="🏅" color="amber" label="Badges & achievements" sub="Coming soon" onClick={() => {}} />
           <ListRow icon="📊" color="amber" label="My chore history" sub="Full log of completed tasks" href="/history" />
           <ListRow icon="⚖️" color="amber" label="My fairness score"
-            sub={stats.totalChores > 0 ? `${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''} completed` : 'No chores yet'} onClick={() => {}} />
-          <ListRow icon="🎁" color="amber" label="Rewards & points"
-            sub={
-              rewardsCount > 0
-                ? `${stats.totalPoints} pts · ${rewardsCount} reward${rewardsCount !== 1 ? 's' : ''} available`
-                : `${stats.totalPoints} pts`
-            }
-            href="/rewards?tab=shop" isLast />
+            sub={stats.totalChores > 0 ? `${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''} completed · ${stats.totalPoints} pts` : 'No chores yet'} onClick={() => {}} isLast noChevron />
         </SectionGroup>
 
         {/* ── Preferences ───────────────────────────────────────────────────── */}
