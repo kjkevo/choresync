@@ -109,6 +109,41 @@ export default function ProfileClient({
   // Appearance is a local-only display preference (no DB column needed)
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system')
 
+  // ── Preview onboarding hydration (sessionStorage) ─────────────────────────
+  // When there's no real session/household, pull what the user entered during
+  // the onboarding walkthrough so the profile reflects their choices instead
+  // of showing empty placeholders.
+  const [preview, setPreview] = useState<{
+    householdName: string
+    adminName:     string
+    memberCount:   number
+    choreCount:    number
+    myChoreCount:  number
+    inviteCode:    string | null
+  } | null>(null)
+
+  useEffect(() => {
+    if (householdId) return    // real household — never override
+    try {
+      const raw = sessionStorage.getItem('cs_preview_onboarding')
+      if (!raw) return
+      const data = JSON.parse(raw) as {
+        name: string
+        members: { name: string; isMe?: boolean }[]
+        chores: { displayAssignTo: string }[]
+      }
+      const me = data.members.find(m => m.isMe)
+      setPreview({
+        householdName: data.name ?? 'Your Household',
+        adminName:     me?.name ?? '',
+        memberCount:   data.members?.length ?? 0,
+        choreCount:    data.chores?.length  ?? 0,
+        myChoreCount:  data.chores?.filter(c => c.displayAssignTo === (me?.name ?? '')).length ?? 0,
+        inviteCode:    null,   // preview households have no real invite code
+      })
+    } catch { /* ignore */ }
+  }, [householdId])
+
   // Google Calendar connection state
   const [gcalConnected,      setGcalConnected]      = useState(googleCalendarConnected)
   const [gcalToast,          setGcalToast]          = useState<string | null>(null)
@@ -240,11 +275,21 @@ export default function ProfileClient({
     if (stored?.startsWith('emoji:')) setEmojiAvatar(stored.slice(6))
   }, [profile?.avatar_url])
 
-  const displayName   = profile?.full_name ?? user.email ?? ''
+  // Resolved display values — prefer real DB data; fall back to preview from
+  // sessionStorage when there is no real session (so users can see their own
+  // onboarding choices reflected back on the profile).
+  const displayName   = profile?.full_name ?? user.email ?? preview?.adminName ?? 'Guest'
   const rawAvatarUrl  = profile?.avatar_url ?? null
   const isEmojiAvatar = rawAvatarUrl?.startsWith('emoji:')
   const currentEmoji  = isEmojiAvatar ? rawAvatarUrl!.slice(6) : null
   const photoUrl      = !isEmojiAvatar ? rawAvatarUrl : null
+
+  // Effective stats — fall back to preview counts when no real data
+  const effectiveStats = {
+    totalChores: stats.totalChores > 0 ? stats.totalChores : (preview?.myChoreCount ?? 0),
+    onTimeRate:  stats.onTimeRate,
+    totalPoints: stats.totalPoints,
+  }
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -437,6 +482,10 @@ export default function ProfileClient({
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
               {membership.household.name} · {membership.role === 'admin' ? 'Admin' : 'Member'}
             </p>
+          ) : preview ? (
+            <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+              {preview.householdName} · Admin
+            </p>
           ) : (
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>No household yet</p>
           )}
@@ -459,9 +508,9 @@ export default function ProfileClient({
         {/* ── Stats bar ───────────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
           {([
-            { num: stats.totalChores, label: 'Chores done', dim: false },
-            { num: stats.onTimeRate !== null ? `${stats.onTimeRate}%` : '—', label: 'On-time rate', dim: stats.onTimeRate === null },
-            { num: stats.totalPoints, label: 'Points', dim: false },
+            { num: effectiveStats.totalChores, label: 'Chores done', dim: false },
+            { num: effectiveStats.onTimeRate !== null ? `${effectiveStats.onTimeRate}%` : '—', label: 'On-time rate', dim: effectiveStats.onTimeRate === null },
+            { num: effectiveStats.totalPoints, label: 'Points', dim: false },
           ] as const).map((s, i) => (
             <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 2 ? '0.5px solid #E5E7EB' : 'none' }}>
               <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
@@ -500,13 +549,16 @@ export default function ProfileClient({
         {/* ── Stats & achievements ───────────────────────────────────────────── */}
         <SectionGroup title="Stats & achievements">
           <ListRow icon="🏅" color="amber" label="Badges & achievements"
-            sub={`${stats.totalChores} earned · complete more to unlock`}
+            sub={`${effectiveStats.totalChores} earned · complete more to unlock`}
             onClick={() => {}} />
           <ListRow icon="📊" color="amber" label="My chore history"
-            sub="Full log of completed tasks" href="/history" />
+            sub={preview && effectiveStats.totalChores === 0
+              ? `${preview.choreCount} chore${preview.choreCount !== 1 ? 's' : ''} in your household`
+              : 'Full log of completed tasks'}
+            href="/history" />
           <ListRow icon="⚖️" color="amber" label="My fairness score"
-            sub={stats.totalChores > 0
-              ? `You're carrying ${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''}`
+            sub={effectiveStats.totalChores > 0
+              ? `You're carrying ${effectiveStats.totalChores} of ${preview?.choreCount ?? effectiveStats.totalChores} chore${effectiveStats.totalChores !== 1 ? 's' : ''}`
               : 'Complete chores to see your score'}
             onClick={() => {}} isLast />
         </SectionGroup>
@@ -571,7 +623,7 @@ export default function ProfileClient({
         {/* ── Households ────────────────────────────────────────────────────── */}
         <SectionGroup title="Households">
           {/* List every household the user belongs to */}
-          {households.map((h, i) => (
+          {households.map((h) => (
             <a
               key={h.id}
               href={`/dashboard?h=${h.id}`}
@@ -580,7 +632,6 @@ export default function ProfileClient({
                 padding: '11px 16px',
                 borderBottom: '0.5px solid #E5E7EB',
                 textDecoration: 'none',
-                opacity: i === 0 || h.id === householdId ? 1 : 1,
               }}
             >
               <div style={{
@@ -605,12 +656,48 @@ export default function ProfileClient({
             </a>
           ))}
 
-          {/* Members row — only when a primary household is selected */}
-          {membership?.household && (
+          {/* Preview household card — shown when no real household exists yet */}
+          {households.length === 0 && preview && (
+            <a
+              href="/dashboard"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '11px 16px',
+                borderBottom: '0.5px solid #E5E7EB',
+                textDecoration: 'none',
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
+              }}>🏠</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {preview.householdName}
+                </span>
+                <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
+                  Admin · Active
+                </span>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C4C4"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+          )}
+
+          {/* Members row — real OR preview */}
+          {membership?.household ? (
             <ListRow icon="👥" color="blue" label="Members"
               sub={`${members.length} member${members.length !== 1 ? 's' : ''} · you're ${membership.role}`}
               onClick={() => {}} />
-          )}
+          ) : preview ? (
+            <ListRow icon="👥" color="blue" label="Members"
+              sub={`${preview.memberCount} member${preview.memberCount !== 1 ? 's' : ''} · you're admin`}
+              onClick={() => {}} />
+          ) : null}
           {/* ── Invite row — only shown when a household exists ── */}
           {membership?.household && (
             <div style={{ borderBottom: 'none' }}>

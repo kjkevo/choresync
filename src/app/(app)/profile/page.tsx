@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ProfileClient from './ProfileClient'
 import type { UserRow } from '@/lib/types/database'
@@ -16,8 +15,38 @@ export default async function ProfilePage({
   const { data: { user } } = await supabase.auth.getUser()
   const { gcal } = await searchParams
 
-  // No session → onboarding (middleware handles this first, but be defensive)
-  if (!user) redirect('/onboarding')
+  // TODO: re-enable before launch
+  // No session → render a preview profile. ProfileClient will hydrate the
+  // visible fields from sessionStorage if onboarding was completed in preview.
+  if (!user) {
+    const guestUser = {
+      id: '', email: '', user_metadata: {}, app_metadata: {},
+      aud: 'authenticated', created_at: '',
+    } as unknown as Parameters<typeof ProfileClient>[0]['user']
+    const guestProfile: UserRow = {
+      id: '', email: '', full_name: null, avatar_url: null,
+      username: null, tagline: null,
+      google_calendar_refresh_token: null,
+      created_at: '', updated_at: '',
+    }
+    return (
+      <ProfileClient
+        user={guestUser}
+        profile={guestProfile}
+        membership={null}
+        householdId={null}
+        members={[]}
+        streak={null}
+        stats={{ totalChores: 0, onTimeRate: null, totalPoints: 0 }}
+        isTopEarner={false}
+        initialUsername=""
+        initialTagline=""
+        googleCalendarConnected={false}
+        gcalStatus={null}
+        allHouseholds={[]}
+      />
+    )
+  }
 
   // ── 1. Profile ────────────────────────────────────────────────────────────
   const { data: profile } = await supabase
