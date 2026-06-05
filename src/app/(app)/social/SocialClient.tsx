@@ -348,10 +348,22 @@ function ChatTab({
     setTimeout(() => scrollToBottom(true), 30)
 
     startSend(async () => {
+      // Preview mode (no real household) — keep the message in local state only.
+      // Real-time persistence requires auth; the message is visible this session.
+      if (!householdId) return
+
       const result = await sendMessage(householdId, text)
       if (result.error) {
-        setMessages(prev => prev.filter(m => m.id !== optimisticId))
+        // On failure, restore the input text so the user doesn't lose what they typed,
+        // but keep the message visible with a faded "failed" look rather than deleting it.
+        setMessages(prev => prev.map(m =>
+          m.id === optimisticId
+            ? { ...m, content: `${text} ⚠️` }   // mark as unsent rather than vanishing
+            : m,
+        ))
+        setInput(text)   // restore input so they can retry
       } else if (result.message) {
+        // Replace the optimistic placeholder with the real persisted message
         setMessages(prev => prev.map(m =>
           m.id === optimisticId
             ? { ...result.message!, author: currentUser as unknown as UserRow, reactions: [] }
