@@ -545,9 +545,19 @@ export default function DashboardClient({
                   background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
                   padding: '24px 20px', textAlign: 'center',
                 }}>
-                  <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                    No chores set up yet — complete onboarding to add chores.
+                  <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 14px' }}>
+                    No chores set up yet.
                   </p>
+                  <a href="/onboarding" style={{
+                    display: 'inline-block',
+                    background: '#FF6B2B', color: '#fff',
+                    borderRadius: 12, padding: '10px 22px',
+                    fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 13,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 14px rgba(255,107,43,0.35)',
+                  }}>
+                    ✨ Add your first chore
+                  </a>
                 </div>
               </section>
             )

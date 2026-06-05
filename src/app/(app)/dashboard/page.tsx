@@ -26,34 +26,8 @@ export default async function DashboardPage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // TODO: re-enable both redirects before launch
-  // Not signed in → start onboarding flow
-  // if (!user) redirect('/onboarding')
-
-  // Preview bypass — show empty dashboard when there's no session
-  if (!user) {
-    const emptyUser: UserRow = {
-      id: '', email: '', full_name: 'Guest', avatar_url: null,
-      username: null, tagline: null, google_calendar_refresh_token: null,
-      created_at: '', updated_at: '',
-    }
-    return (
-      <DashboardClient
-        currentUser={emptyUser}
-        myOverdueChores={[]}
-        myTodayChores={[]}
-        householdName="Your Household"
-        householdId=""
-        colorMap={{}}
-        myStreak={null}
-        pinnedAnnouncements={[]}
-        recentActivity={[]}
-        allHouseholds={[]}
-        householdAllChores={[]}
-        leaderboard={[]}
-      />
-    )
-  }
+  // Fix #1: real auth gate. No session → /login (preview bypass removed).
+  if (!user) redirect('/login?redirectTo=/dashboard')
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([
@@ -64,31 +38,8 @@ export default async function DashboardPage({
   ])
   const profile = profileRaw as UserRow | null
 
-  // No household → send to onboarding
-  // if (!allMemberships || allMemberships.length === 0) redirect('/onboarding')
-  if (!allMemberships || allMemberships.length === 0) {
-    const emptyUser: UserRow = {
-      id: user.id, email: user.email ?? '', full_name: user.user_metadata?.full_name ?? null,
-      avatar_url: null, username: null, tagline: null,
-      google_calendar_refresh_token: null, created_at: '', updated_at: '',
-    }
-    return (
-      <DashboardClient
-        currentUser={emptyUser}
-        myOverdueChores={[]}
-        myTodayChores={[]}
-        householdName="Your Household"
-        householdId=""
-        colorMap={{}}
-        myStreak={null}
-        pinnedAnnouncements={[]}
-        recentActivity={[]}
-        allHouseholds={[]}
-        householdAllChores={[]}
-        leaderboard={[]}
-      />
-    )
-  }
+  // Fix #2: must belong to a household; otherwise run onboarding.
+  if (!allMemberships || allMemberships.length === 0) redirect('/onboarding')
 
   // Pick active household: prefer ?h= param, else first membership
   const allHouseholdIds = allMemberships.map(m => m.household_id)
