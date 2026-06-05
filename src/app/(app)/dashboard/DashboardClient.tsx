@@ -667,49 +667,110 @@ export default function DashboardClient({
           )}
 
           {/* ── Leaderboard — always at the bottom ───────────────────────────── */}
-          {leaderboard.length > 0 && (
-            <section style={{ marginBottom: 24 }}>
-              <SectionTitle icon="🏆" label="Rankings" color="#B45309" />
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
-                {leaderboard.slice(0, 5).map((entry, i) => {
-                  const isMe      = entry.userId === currentUser.id
-                  const medals    = ['🥇', '🥈', '🥉']
-                  const rankBadge = medals[i] ?? `#${i + 1}`
-                  const isEmoji   = entry.avatarUrl?.startsWith('emoji:')
-                  return (
-                    <div key={entry.userId} style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '11px 16px',
-                      borderBottom: i < Math.min(leaderboard.length, 5) - 1 ? '1px solid #F7F8FA' : 'none',
-                      background: isMe ? '#FFF9F7' : 'transparent',
-                      borderLeft: isMe ? '3px solid #FF6B2B' : '3px solid transparent',
-                    }}>
-                      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{rankBadge}</span>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: entry.color, flexShrink: 0, overflow: 'hidden',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
-                      }}>
-                        {isEmoji ? entry.avatarUrl!.slice(6) : (entry.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? '?')}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? '#FF6B2B' : '#111827', fontFamily: '"Poppins", sans-serif' }}>
-                          {isMe ? 'You' : (entry.name ?? 'Unknown')}
-                        </p>
-                        {entry.currentStreak >= 2 && (
-                          <p style={{ margin: 0, fontSize: 11, color: '#EA580C' }}>🔥 {entry.currentStreak}-day streak</p>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
-                        {entry.totalPoints} pts
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+          {(() => {
+            const medals = ['🥇', '🥈', '🥉']
+
+            // Real leaderboard row
+            const RealRow = ({ entry, i, total }: { entry: typeof leaderboard[0]; i: number; total: number }) => {
+              const isMe    = entry.userId === currentUser.id
+              const isEmoji = entry.avatarUrl?.startsWith('emoji:')
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  borderBottom: i < total - 1 ? '1px solid #F7F8FA' : 'none',
+                  background: isMe ? '#FFF9F7' : 'transparent',
+                  borderLeft: isMe ? '3px solid #FF6B2B' : '3px solid transparent',
+                }}>
+                  <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>
+                    {medals[i] ?? <span style={{ fontSize: 13, fontWeight: 700, color: '#9CA3AF' }}>#{i + 1}</span>}
+                  </span>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: entry.color, flexShrink: 0, overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
+                  }}>
+                    {isEmoji ? entry.avatarUrl!.slice(6) : (entry.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? '?')}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? '#FF6B2B' : '#111827', fontFamily: '"Poppins", sans-serif' }}>
+                      {isMe ? 'You' : (entry.name ?? 'Unknown')}
+                    </p>
+                    {entry.currentStreak >= 2 && (
+                      <p style={{ margin: 0, fontSize: 11, color: '#EA580C' }}>🔥 {entry.currentStreak}-day streak</p>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
+                    {entry.totalPoints} pts
+                  </span>
+                </div>
+              )
+            }
+
+            // Preview leaderboard row (sessionStorage members, all at 0 pts)
+            const PreviewRow = ({ m, i, total }: { m: PreviewMember; i: number; total: number }) => {
+              const isYou   = !!m.isMe
+              const isEmoji = m.avatarUrl?.startsWith('emoji:')
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  borderBottom: i < total - 1 ? '1px solid #F7F8FA' : 'none',
+                  background: isYou ? '#FFF9F7' : 'transparent',
+                  borderLeft: isYou ? '3px solid #FF6B2B' : '3px solid transparent',
+                }}>
+                  <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>
+                    {medals[i] ?? <span style={{ fontSize: 13, fontWeight: 700, color: '#9CA3AF' }}>#{i + 1}</span>}
+                  </span>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: m.color, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
+                    overflow: 'hidden',
+                  }}>
+                    {isEmoji
+                      ? m.avatarUrl!.slice(6)
+                      : m.avatarUrl
+                        ? <Image src={m.avatarUrl} alt={m.name ?? ''} width={34} height={34} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
+                        : initials(m.name)
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: isYou ? 800 : 600, color: isYou ? '#FF6B2B' : '#111827', fontFamily: '"Poppins", sans-serif' }}>
+                      {isYou ? 'You' : (m.name ?? 'Unknown')}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 11, color: '#9CA3AF' }}>Complete chores to earn points</p>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
+                    0 pts
+                  </span>
+                </div>
+              )
+            }
+
+            const showReal    = leaderboard.length > 0
+            const showPreview = !showReal && previewMembers.length > 0
+
+            if (!showReal && !showPreview) return null
+
+            return (
+              <section style={{ marginBottom: 24 }}>
+                <SectionTitle icon="🏆" label="Leaderboard" color="#B45309" />
+                <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                  {showReal
+                    ? leaderboard.slice(0, 5).map((entry, i) => (
+                        <RealRow key={entry.userId} entry={entry} i={i} total={Math.min(leaderboard.length, 5)} />
+                      ))
+                    : previewMembers.map((m, i) => (
+                        <PreviewRow key={m.id ?? i} m={m} i={i} total={previewMembers.length} />
+                      ))
+                  }
+                </div>
+              </section>
+            )
+          })()}
         </main>
 
         {/* ── Bottom nav ────────────────────────────────────────────────────── */}
