@@ -27,12 +27,14 @@ const COLOR_OPTIONS = [
   '#3B82F6','#84CC16',
 ]
 
+// Exact palette from the profile mockup
 const ICON_BG: Record<string, { bg: string; fg: string }> = {
   purple: { bg: '#EEEDFE', fg: '#534AB7' },
   teal:   { bg: '#E1F5EE', fg: '#0F6E56' },
   amber:  { bg: '#FAEEDA', fg: '#854F0B' },
   coral:  { bg: '#FAECE7', fg: '#993C1D' },
   blue:   { bg: '#E6F1FB', fg: '#185FA5' },
+  pink:   { bg: '#FBEAF0', fg: '#993556' },
   red:    { bg: '#FEE2E2', fg: '#B91C1C' },
 }
 
@@ -374,44 +376,41 @@ export default function ProfileClient({
       <style>{FONTS}</style>
       <div style={{ minHeight: '100dvh', background: '#F2F2F7', fontFamily: '"Nunito", sans-serif', paddingBottom: 88 }}>
 
-        {/* Top bar */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 12px' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              My Profile
-            </span>
-            {householdId && (
-              <button
-                onClick={() => setActiveTab('chores')}
-                style={{
-                  background: '#FF6B2B', color: '#fff', border: 'none', borderRadius: 20,
-                  padding: '5px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                  fontFamily: '"Nunito", sans-serif', display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                ✨ Add Chore
-              </button>
-            )}
-          </div>
+        {/* ── Top bar — matches mockup ─────────────────────────────────────── */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 40, background: '#fff',
+          borderBottom: '0.5px solid #E5E7EB',
+          padding: '14px 16px 12px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#9CA3AF', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            My profile
+          </span>
+          {/* Settings shortcut */}
+          <a href="/settings" style={{ display: 'flex', alignItems: 'center', color: '#9CA3AF', textDecoration: 'none' }} aria-label="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+          </a>
         </div>
 
-        {/* Hero */}
+        {/* ── Hero ────────────────────────────────────────────────────────────── */}
         <div style={{
-          background: '#fff', padding: '20px 16px 18px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          background: '#fff', padding: '20px 16px 0',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
           borderBottom: '0.5px solid #E5E7EB',
         }}>
-          {/* Avatar with edit badge */}
+          {/* Avatar + pencil badge */}
           <button
             onClick={() => openEdit('avatar')}
-            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 4 }}
             aria-label="Edit avatar"
           >
             <div style={{
               width: 72, height: 72, borderRadius: '50%', background: selectedColor,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               overflow: 'hidden', fontSize: currentEmoji ? 34 : 24,
-              fontWeight: 700, color: '#fff',
+              fontWeight: 500, color: '#fff',
             }}>
               {currentEmoji ? currentEmoji
                 : photoUrl
@@ -420,62 +419,52 @@ export default function ProfileClient({
               }
             </div>
             <div style={{
-              position: 'absolute', bottom: 1, right: 1, width: 22, height: 22,
-              borderRadius: '50%', background: '#EAF3DE', border: '2.5px solid #fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+              position: 'absolute', bottom: 0, right: 0, width: 22, height: 22,
+              borderRadius: '50%', background: '#EAF3DE', border: '2px solid #fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              ✏️
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#27500A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
             </div>
           </button>
 
-          <p style={{ fontSize: 18, fontWeight: 600, color: '#111827', margin: 0, fontFamily: '"Poppins", sans-serif' }}>
+          <p style={{ fontSize: 18, fontWeight: 500, color: '#111827', margin: 0, fontFamily: '"Poppins", sans-serif' }}>
             {displayName}
           </p>
 
-          {membership?.household && (
+          {membership?.household ? (
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-              {membership.household.name} · {membership.role === 'admin' ? '👑 Admin' : 'Member'}
+              {membership.household.name} · {membership.role === 'admin' ? 'Admin' : 'Member'}
             </p>
-          )}
-
-          {tagline ? (
-            <button onClick={() => openEdit('tagline')} style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic', background: 'none', border: 'none', cursor: 'pointer', fontFamily: '"Nunito", sans-serif', textAlign: 'center' }}>
-              "{tagline}"
-            </button>
           ) : (
-            <button onClick={() => openEdit('tagline')} style={{ fontSize: 13, color: '#C4C4C4', background: 'none', border: 'none', cursor: 'pointer', fontStyle: 'italic', fontFamily: '"Nunito", sans-serif' }}>
-              + Add a personal tagline
-            </button>
+            <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>No household yet</p>
           )}
 
-          {/* Badges */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }}>
+          {/* Streak + achievement badges */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', margin: '4px 0 16px' }}>
             {(streak?.current_streak ?? 0) >= 2 && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#FAEEDA', color: '#633806' }}>
+              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: '#FAEEDA', color: '#633806' }}>
                 🔥 {streak!.current_streak}-day streak
               </span>
             )}
             {isTopEarner && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#EAF3DE', color: '#27500A' }}>
-                🏆 Top earner
+              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A' }}>
+                🏆 Top cleaner
               </span>
             )}
           </div>
         </div>
 
-        {/* Stats bar */}
+        {/* ── Stats bar ───────────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
-          {[
-            { num: stats.totalChores,
-              label: 'Chores done' },
-            { num: stats.onTimeRate !== null ? `${stats.onTimeRate}%` : '—',
-              label: 'On-time rate',
-              dim: stats.onTimeRate === null },
-            { num: stats.totalPoints,
-              label: 'Points' },
-          ].map((s, i) => (
+          {([
+            { num: stats.totalChores, label: 'Chores done', dim: false },
+            { num: stats.onTimeRate !== null ? `${stats.onTimeRate}%` : '—', label: 'On-time rate', dim: stats.onTimeRate === null },
+            { num: stats.totalPoints, label: 'Points', dim: false },
+          ] as const).map((s, i) => (
             <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 2 ? '0.5px solid #E5E7EB' : 'none' }}>
-              <span style={{ fontSize: 19, fontWeight: 700, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
+              <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
                 {s.num}
               </span>
               <span style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginTop: 2 }}>{s.label}</span>
@@ -510,15 +499,21 @@ export default function ProfileClient({
 
         {/* ── Stats & achievements ───────────────────────────────────────────── */}
         <SectionGroup title="Stats & achievements">
-          <ListRow icon="🏅" color="amber" label="Badges & achievements" sub="Coming soon" onClick={() => {}} />
-          <ListRow icon="📊" color="amber" label="My chore history" sub="Full log of completed tasks" href="/history" />
+          <ListRow icon="🏅" color="amber" label="Badges & achievements"
+            sub={`${stats.totalChores} earned · complete more to unlock`}
+            onClick={() => {}} />
+          <ListRow icon="📊" color="amber" label="My chore history"
+            sub="Full log of completed tasks" href="/history" />
           <ListRow icon="⚖️" color="amber" label="My fairness score"
-            sub={stats.totalChores > 0 ? `${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''} completed · ${stats.totalPoints} pts` : 'No chores yet'} onClick={() => {}} isLast noChevron />
+            sub={stats.totalChores > 0
+              ? `You're carrying ${stats.totalChores} chore${stats.totalChores !== 1 ? 's' : ''}`
+              : 'Complete chores to see your score'}
+            onClick={() => {}} isLast />
         </SectionGroup>
 
         {/* ── Preferences ───────────────────────────────────────────────────── */}
         <SectionGroup title="Preferences">
-          <ListRow icon="🔔" color="teal" label="Notifications" sub="Manage alerts and quiet hours" onClick={() => {}} />
+          <ListRow icon="🔔" color="teal" label="Notifications" sub="Quiet hours and alert settings" onClick={() => {}} />
           <ListRow icon="🌙" color="teal" label="Appearance"
             sub={appearance === 'system' ? 'System default' : appearance === 'dark' ? 'Dark mode' : 'Light mode'}
             onClick={() => openEdit('appearance')} />
@@ -526,7 +521,7 @@ export default function ProfileClient({
           {/* Calendar sync — real Google OAuth row */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            padding: '12px 16px',
+            padding: '11px 16px',
             borderBottom: 'none',
           }}>
             <div style={{
@@ -535,11 +530,11 @@ export default function ProfileClient({
               background: ICON_BG.teal.bg, color: ICON_BG.teal.fg,
             }}>📅</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600 }}>
+              <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400 }}>
                 Calendar sync
               </span>
               <span style={{ fontSize: 12, display: 'block', marginTop: 1, color: gcalConnected ? '#10B981' : '#9CA3AF' }}>
-                {gcalConnected ? '✓ Connected to Google Calendar' : 'Sync chores with Google Calendar'}
+                {gcalConnected ? 'Linked to Google Calendar' : 'Sync chores with Google Calendar'}
               </span>
             </div>
             {gcalConnected ? (
@@ -582,9 +577,10 @@ export default function ProfileClient({
               href={`/dashboard?h=${h.id}`}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px',
-                borderBottom: i < households.length - 1 ? '0.5px solid #F3F4F6' : 'none',
+                padding: '11px 16px',
+                borderBottom: '0.5px solid #E5E7EB',
                 textDecoration: 'none',
+                opacity: i === 0 || h.id === householdId ? 1 : 1,
               }}
             >
               <div style={{
@@ -593,14 +589,13 @@ export default function ProfileClient({
                 background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
               }}>🏠</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600,
+                <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {h.name}
                 </span>
                 <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
-                  {h.role === 'admin' ? '👑 Admin' : 'Member'}
-                  {' · '}
-                  {h.id === householdId ? 'Active' : 'Switch →'}
+                  {h.role === 'admin' ? 'Admin' : 'Member'}
+                  {h.id === householdId ? ' · Active' : ''}
                 </span>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C4C4"
@@ -620,20 +615,18 @@ export default function ProfileClient({
           {membership?.household && (
             <div style={{ borderBottom: 'none' }}>
               {/* Header row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px' }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
                   background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
                 }}>🔗</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 600 }}>
+                  <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400 }}>
                     Invite someone
                   </span>
                   <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
-                    Code: <strong style={{ color: '#FF6B2B', letterSpacing: '0.06em' }}>
-                      {membership.household.invite_code}
-                    </strong>
+                    Share a link or send an email
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -744,8 +737,8 @@ export default function ProfileClient({
         <SectionGroup title="Account & privacy">
           <ListRow icon="🔒" color="coral" label="Change password" sub="Update your login credentials" href="/forgot-password" />
           <ListRow icon="✉️" color="coral" label="Email address" sub={user.email ?? '—'} onClick={() => {}} noChevron />
-          <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Export or delete your account" href="/privacy" />
-          <ListRow icon="🚪" color="red" label="Sign out" labelColor="#B91C1C"
+          <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Export or delete your data" href="/privacy" />
+          <ListRow icon="🚪" color="pink" label="Sign out" labelColor="#993556"
             onClick={handleSignOut}
             right={isSigningOut ? <span style={{ fontSize: 12, color: '#9CA3AF' }}>Signing out…</span> : undefined}
             isLast noChevron />
@@ -951,12 +944,20 @@ export default function ProfileClient({
 
 function SectionGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', padding: '10px 16px 5px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-        {title}
+    <>
+      {/* 8px grey divider band between sections — matches the mockup */}
+      <div style={{ height: 8, background: '#F2F2F7' }} />
+      <div style={{ background: '#fff' }}>
+        <div style={{
+          fontSize: 11, fontWeight: 500, color: '#9CA3AF',
+          padding: '12px 16px 6px',
+          letterSpacing: '0.04em', textTransform: 'uppercase',
+        }}>
+          {title}
+        </div>
+        {children}
       </div>
-      <div style={{ background: '#fff' }}>{children}</div>
-    </div>
+    </>
   )
 }
 
@@ -974,7 +975,7 @@ function ListRow({
   isLast?:     boolean
   noChevron?:  boolean
 }) {
-  const borderBottom = isLast ? 'none' : '0.5px solid #F3F4F6'
+  const borderBottom = isLast ? 'none' : '0.5px solid #E5E7EB'
   const inner = (
     <>
       <div style={{
@@ -986,7 +987,7 @@ function ListRow({
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 14, color: labelColor ?? '#111827', display: 'block', fontWeight: 600 }}>
+        <span style={{ fontSize: 14, color: labelColor ?? '#111827', display: 'block', fontWeight: 400 }}>
           {label}
         </span>
         {sub && (
@@ -1005,7 +1006,7 @@ function ListRow({
 
   const sharedStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '12px 16px', borderBottom,
+    padding: '11px 16px', borderBottom,
     width: '100%', textAlign: 'left',
     cursor: (onClick || href) ? 'pointer' : 'default',
   }
