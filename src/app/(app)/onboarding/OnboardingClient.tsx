@@ -263,18 +263,37 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
     if (!household) return
     clearError()
     if (!isLoggedIn) {
-      // Save preview state to sessionStorage so dashboard can display it
+      // Resolve final display assignee for every chore before saving.
+      // Explicitly assigned chores keep their owner; unassigned chores are
+      // distributed in round-robin across all household members so that every
+      // person shows up in the dashboard with a non-empty chore list.
+      const adminDisplayName = adminName.trim() || 'You'
+      const allNames = [adminDisplayName, ...members.map(m => m.name)]
+      let rotateIdx = 0
+      const resolvedChores = chores
+        .filter(c => c.name.trim())
+        .map(c => {
+          let displayAssignTo: string
+          if (c.assignTo === 'me') {
+            displayAssignTo = adminDisplayName
+          } else if (c.assignTo === 'unassigned' || !c.assignTo) {
+            // Distribute unassigned chores round-robin so every member gets some
+            displayAssignTo = allNames[rotateIdx % allNames.length]
+            rotateIdx++
+          } else {
+            displayAssignTo = c.assignTo  // already a specific member's name
+          }
+          return { name: c.name, emoji: c.emoji, points: c.points, freq: c.freq, displayAssignTo }
+        })
+
       try {
         sessionStorage.setItem('cs_preview_onboarding', JSON.stringify({
           name: household.name,
           members: [
-            { name: adminName || 'You', color: '#FF6B2B', avatarUrl: null, isMe: true },
+            { name: adminDisplayName, color: '#FF6B2B', avatarUrl: null, isMe: true },
             ...members.map(m => ({ name: m.name, color: m.color, avatarUrl: null, isMe: false })),
           ],
-          chores: chores.map(c => ({
-            name: c.name, emoji: c.emoji, points: c.points,
-            freq: c.freq, assignTo: c.assignTo,
-          })),
+          chores: resolvedChores,
         }))
       } catch { /* ignore */ }
       router.push('/dashboard')

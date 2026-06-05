@@ -109,11 +109,11 @@ interface PreviewMember {
   isMe?:     boolean
 }
 interface PreviewChore {
-  name:     string
-  emoji:    string
-  points:   number
-  freq:     string
-  assignTo: string
+  name:            string
+  emoji:           string
+  points:          number
+  freq:            string
+  displayAssignTo: string   // pre-resolved name (no 'me' / 'unassigned' — always a display name)
 }
 
 interface DashboardClientProps {
@@ -477,14 +477,9 @@ export default function DashboardClient({
 
             // ── preview path ─────────────────────────────────────────────────
             if (isPreview) {
-              const myChores   = previewChores.filter(c => c.assignTo === 'me')
-              const unassigned = previewChores.filter(c => c.assignTo === 'unassigned')
-              // One section per named roommate
-              const roommates  = [...new Set(
-                previewChores
-                  .filter(c => c.assignTo !== 'me' && c.assignTo !== 'unassigned')
-                  .map(c => c.assignTo)
-              )]
+              // Group by pre-resolved displayAssignTo name.
+              // Preserve member order: admin (isMe) first, then roommates in order.
+              const memberOrder = previewMembers.map(m => m.name ?? '')
 
               const renderPreviewGroup = (
                 label: string,
@@ -531,13 +526,13 @@ export default function DashboardClient({
               return (
                 <section style={{ marginBottom: 20 }}>
                   <SectionTitle icon="📋" label="Chores" color="#374151" />
-                  {renderPreviewGroup('Your chores', myChores, '#FF6B2B', true)}
-                  {roommates.map(name => renderPreviewGroup(
-                    `${name}'s chores`,
-                    previewChores.filter(c => c.assignTo === name),
-                    '#6B7280', false,
-                  ))}
-                  {renderPreviewGroup('Unassigned', unassigned, '#9CA3AF', false)}
+                  {memberOrder.map(memberName => {
+                    const m       = previewMembers.find(pm => (pm.name ?? '') === memberName)
+                    const isYou   = !!(m as PreviewMember | undefined)?.isMe
+                    const section = previewChores.filter(c => c.displayAssignTo === memberName)
+                    const label   = isYou ? 'Your chores' : `${memberName}'s chores`
+                    return renderPreviewGroup(label, section, isYou ? '#FF6B2B' : '#6B7280', isYou)
+                  })}
                 </section>
               )
             }
