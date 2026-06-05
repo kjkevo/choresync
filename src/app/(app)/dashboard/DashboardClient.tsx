@@ -100,6 +100,22 @@ interface MemberSummary {
   color:     string
 }
 
+// Used for sessionStorage preview data (unauthenticated walkthrough)
+interface PreviewMember {
+  id?:       string
+  name:      string | null
+  avatarUrl: string | null
+  color:     string
+  isMe?:     boolean
+}
+interface PreviewChore {
+  name:     string
+  emoji:    string
+  points:   number
+  freq:     string
+  assignTo: string
+}
+
 interface DashboardClientProps {
   currentUser:         UserRow
   myOverdueChores:     ChoreWithAssignee[]
@@ -143,6 +159,27 @@ export default function DashboardClient({
   const [dismissedPins,  setDismissedPins]  = useState<Set<string>>(new Set())
   const [switcherOpen,   setSwitcherOpen]   = useState(false)
   const [, startTransition]                 = useTransition()
+
+  // ── Preview onboarding data (sessionStorage, for unauthenticated walkthroughs) ──
+  const [previewHouseholdName, setPreviewHouseholdName] = useState('')
+  const [previewMembers,  setPreviewMembers]  = useState<PreviewMember[]>([])
+  const [previewChores,   setPreviewChores]   = useState<PreviewChore[]>([])
+
+  useEffect(() => {
+    if (householdId) return  // real household — don't override
+    try {
+      const raw = sessionStorage.getItem('cs_preview_onboarding')
+      if (!raw) return
+      const data = JSON.parse(raw) as {
+        name: string
+        members: PreviewMember[]
+        chores: PreviewChore[]
+      }
+      setPreviewHouseholdName(data.name ?? '')
+      setPreviewMembers(data.members ?? [])
+      setPreviewChores(data.chores ?? [])
+    } catch { /* ignore */ }
+  }, [householdId])
 
   const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
   const totalPending = overdueChores.length + todayChores.length
@@ -220,7 +257,7 @@ export default function DashboardClient({
                 display: 'flex', alignItems: 'center', gap: 4,
               }}
             >
-              {householdName}
+              {previewHouseholdName || householdName}
               {allHouseholds.length > 1 && (
                 <span style={{ fontSize: 10, color: '#9CA3AF' }}>▾</span>
               )}
@@ -391,10 +428,81 @@ export default function DashboardClient({
             )}
           </section>
 
-          {/* ── Household Chores ──────────────────────────────────────────────── */}
+          {/* ── Members (moved above chores) ─────────────────────────────────── */}
+          {(members.length > 0 || previewMembers.length > 0) && (
+            <section style={{ marginBottom: 20 }}>
+              <SectionTitle icon="👥" label="Members" color="#374151" />
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
+                padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              }}>
+                {(members.length > 0 ? members : previewMembers).map((m, idx) => {
+                  const isMe = members.length > 0 ? m.id === currentUser.id : (m as PreviewMember).isMe
+                  const isEmoji = m.avatarUrl?.startsWith('emoji:')
+                  return (
+                    <div key={m.id || idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        background: m.color, overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: isEmoji ? 22 : 14, fontWeight: 700, color: '#fff',
+                        border: isMe ? '2.5px solid #FF6B2B' : '2.5px solid transparent',
+                      }}>
+                        {isEmoji
+                          ? m.avatarUrl!.slice(6)
+                          : m.avatarUrl
+                            ? <Image src={m.avatarUrl} alt={m.name ?? ''} width={44} height={44} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
+                            : initials(m.name)
+                        }
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isMe ? '#FF6B2B' : '#6B7280', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        {isMe ? 'You' : (m.name?.split(' ')[0] ?? '?')}
+                      </span>
+                    </div>
+                  )
+                })}
+                <a href="/household" style={{
+                  width: 44, height: 44, borderRadius: '50%',
+                  background: '#F3F4F6', border: '2px dashed #D1D5DB',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, textDecoration: 'none', color: '#9CA3AF', flexShrink: 0,
+                }} title="Manage household">+</a>
+              </div>
+            </section>
+          )}
+
+          {/* ── Household Chores (real or preview) ───────────────────────────── */}
           <section style={{ marginBottom: 20 }}>
             <SectionTitle icon="🏠" label="Household Chores" color="#374151" />
-            {householdAllChores.length === 0 ? (
+            {householdAllChores.length === 0 && previewChores.length > 0 ? (
+              // Show preview chores from sessionStorage for unauthenticated walkthroughs
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                {previewChores.map((chore, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 16px',
+                    borderBottom: i < previewChores.length - 1 ? '1px solid #F7F8FA' : 'none',
+                  }}>
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{chore.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, fontSize: 13, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {chore.name}
+                      </p>
+                      {chore.assignTo && chore.assignTo !== 'unassigned' && (
+                        <p style={{ fontSize: 11, color: '#9CA3AF', margin: '2px 0 0' }}>
+                          {chore.assignTo === 'me' ? 'You' : chore.assignTo} · {chore.freq}
+                        </p>
+                      )}
+                    </div>
+                    {chore.points > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0 }}>
+                        {chore.points} pts
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : householdAllChores.length === 0 ? (
               <div style={{
                 background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
                 padding: '24px 20px', textAlign: 'center',
@@ -456,108 +564,6 @@ export default function DashboardClient({
             )}
           </section>
 
-          {/* ── Rankings ─────────────────────────────────────────────────────── */}
-          {leaderboard.length > 0 && (
-            <section style={{ marginBottom: 20 }}>
-              <SectionTitle icon="🏆" label="Rankings" color="#B45309" />
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
-                {leaderboard.slice(0, 5).map((entry, i) => {
-                  const isMe    = entry.userId === currentUser.id
-                  const medals  = ['🥇', '🥈', '🥉']
-                  const rankBadge = medals[i] ?? `#${i + 1}`
-                  const isEmoji = entry.avatarUrl?.startsWith('emoji:')
-                  return (
-                    <div
-                      key={entry.userId}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '11px 16px',
-                        borderBottom: i < Math.min(leaderboard.length, 5) - 1 ? '1px solid #F7F8FA' : 'none',
-                        background: isMe ? '#FFF9F7' : 'transparent',
-                        borderLeft: isMe ? `3px solid #FF6B2B` : '3px solid transparent',
-                      }}
-                    >
-                      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{rankBadge}</span>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: entry.color, flexShrink: 0, overflow: 'hidden',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
-                      }}>
-                        {isEmoji ? entry.avatarUrl!.slice(6) : (entry.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? '?')}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          margin: 0, fontSize: 13, fontWeight: isMe ? 800 : 600,
-                          color: isMe ? '#FF6B2B' : '#111827',
-                          fontFamily: '"Poppins", sans-serif',
-                        }}>
-                          {isMe ? 'You' : (entry.name ?? 'Unknown')}
-                        </p>
-                        {entry.currentStreak >= 2 && (
-                          <p style={{ margin: 0, fontSize: 11, color: '#EA580C' }}>🔥 {entry.currentStreak}-day streak</p>
-                        )}
-                      </div>
-                      <span style={{
-                        fontSize: 13, fontWeight: 800,
-                        color: '#B45309', background: '#FFFBEB',
-                        borderRadius: 99, padding: '3px 10px', flexShrink: 0,
-                      }}>
-                        {entry.totalPoints} pts
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* ── Members section ──────────────────────────────────────────────── */}
-          {members.length > 0 && (
-            <section style={{ marginBottom: 20 }}>
-              <SectionTitle icon="👥" label="Members" color="#374151" />
-              <div style={{
-                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
-                padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-              }}>
-                {members.map(m => {
-                  const isMe = m.id === currentUser.id
-                  const isEmoji = m.avatarUrl?.startsWith('emoji:')
-                  return (
-                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <div style={{
-                        width: 44, height: 44, borderRadius: '50%',
-                        background: m.color, overflow: 'hidden',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: isEmoji ? 22 : 14, fontWeight: 700, color: '#fff',
-                        border: isMe ? '2.5px solid #FF6B2B' : '2.5px solid transparent',
-                      }}>
-                        {isEmoji
-                          ? m.avatarUrl!.slice(6)
-                          : m.avatarUrl
-                            ? <Image src={m.avatarUrl} alt={m.name ?? ''} width={44} height={44} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
-                            : initials(m.name)
-                        }
-                      </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: isMe ? '#FF6B2B' : '#6B7280', maxWidth: 48, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                        {isMe ? 'You' : (m.name?.split(' ')[0] ?? '?')}
-                      </span>
-                    </div>
-                  )
-                })}
-                <a href="/household" style={{
-                  width: 44, height: 44, borderRadius: '50%',
-                  background: '#F3F4F6', border: '2px dashed #D1D5DB',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 20, textDecoration: 'none', color: '#9CA3AF',
-                  flexShrink: 0,
-                }} title="Manage household">
-                  +
-                </a>
-              </div>
-            </section>
-          )}
-
           {/* ── Chat CTA (when no activity yet) ──────────────────────────────── */}
           {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
             <a href="/social" style={{
@@ -579,19 +585,9 @@ export default function DashboardClient({
           )}
 
           {/* ── Activity feed ─────────────────────────────────────────────────── */}
-          <section style={{ marginBottom: 24 }}>
-            <SectionTitle icon="📡" label="Recent Activity" color="#6B7280" />
-            {recentActivity.length === 0 ? (
-              <div style={{
-                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
-                padding: '28px 20px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>🏡</div>
-                <p style={{ fontSize: 14, color: '#9CA3AF', margin: 0 }}>
-                  No activity yet — start completing chores!
-                </p>
-              </div>
-            ) : (
+          {recentActivity.length > 0 && (
+            <section style={{ marginBottom: 24 }}>
+              <SectionTitle icon="📡" label="Recent Activity" color="#6B7280" />
               <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
                 {recentActivity.map((item, i) => (
                   <ActivityRow
@@ -604,8 +600,53 @@ export default function DashboardClient({
                   />
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
+
+          {/* ── Leaderboard — always at the bottom ───────────────────────────── */}
+          {leaderboard.length > 0 && (
+            <section style={{ marginBottom: 24 }}>
+              <SectionTitle icon="🏆" label="Rankings" color="#B45309" />
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
+                {leaderboard.slice(0, 5).map((entry, i) => {
+                  const isMe      = entry.userId === currentUser.id
+                  const medals    = ['🥇', '🥈', '🥉']
+                  const rankBadge = medals[i] ?? `#${i + 1}`
+                  const isEmoji   = entry.avatarUrl?.startsWith('emoji:')
+                  return (
+                    <div key={entry.userId} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '11px 16px',
+                      borderBottom: i < Math.min(leaderboard.length, 5) - 1 ? '1px solid #F7F8FA' : 'none',
+                      background: isMe ? '#FFF9F7' : 'transparent',
+                      borderLeft: isMe ? '3px solid #FF6B2B' : '3px solid transparent',
+                    }}>
+                      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{rankBadge}</span>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: entry.color, flexShrink: 0, overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: isEmoji ? 17 : 12, fontWeight: 700, color: '#fff',
+                      }}>
+                        {isEmoji ? entry.avatarUrl!.slice(6) : (entry.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? '?')}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: isMe ? 800 : 600, color: isMe ? '#FF6B2B' : '#111827', fontFamily: '"Poppins", sans-serif' }}>
+                          {isMe ? 'You' : (entry.name ?? 'Unknown')}
+                        </p>
+                        {entry.currentStreak >= 2 && (
+                          <p style={{ margin: 0, fontSize: 11, color: '#EA580C' }}>🔥 {entry.currentStreak}-day streak</p>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
+                        {entry.totalPoints} pts
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
         </main>
 
         {/* ── Bottom nav ────────────────────────────────────────────────────── */}

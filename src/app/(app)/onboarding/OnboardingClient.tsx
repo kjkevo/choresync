@@ -262,7 +262,24 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
   async function handleFinish() {
     if (!household) return
     clearError()
-    if (!isLoggedIn) { router.push('/dashboard'); return }   // preview bypass — skip success, go straight to dashboard
+    if (!isLoggedIn) {
+      // Save preview state to sessionStorage so dashboard can display it
+      try {
+        sessionStorage.setItem('cs_preview_onboarding', JSON.stringify({
+          name: household.name,
+          members: [
+            { name: adminName || 'You', color: '#FF6B2B', avatarUrl: null, isMe: true },
+            ...members.map(m => ({ name: m.name, color: m.color, avatarUrl: null, isMe: false })),
+          ],
+          chores: chores.map(c => ({
+            name: c.name, emoji: c.emoji, points: c.points,
+            freq: c.freq, assignTo: c.assignTo,
+          })),
+        }))
+      } catch { /* ignore */ }
+      router.push('/dashboard')
+      return
+    }
     const today = new Date().toISOString().split('T')[0]
     startTransition(async () => {
       for (const chore of chores) {

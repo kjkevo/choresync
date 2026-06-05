@@ -3,10 +3,9 @@
 import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home',    icon: <HomeIcon />    },
-  { href: '/social',    label: 'Chat',    icon: <ChatIcon />    },
-  { href: '/rewards',   label: 'Rewards', icon: <RewardsIcon /> },
-  { href: '/profile',   label: 'Profile', icon: <PersonIcon />  },
+  { href: '/dashboard', label: 'Home',    icon: <HomeIcon />   },
+  { href: '/social',    label: 'Chat',    icon: <ChatIcon />   },
+  { href: '/profile',   label: 'Profile', icon: <PersonIcon /> },
 ] as const
 
 export default function BottomNav() {
