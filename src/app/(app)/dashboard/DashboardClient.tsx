@@ -471,98 +471,166 @@ export default function DashboardClient({
             </section>
           )}
 
-          {/* ── Household Chores (real or preview) ───────────────────────────── */}
-          <section style={{ marginBottom: 20 }}>
-            <SectionTitle icon="🏠" label="Household Chores" color="#374151" />
-            {householdAllChores.length === 0 && previewChores.length > 0 ? (
-              // Show preview chores from sessionStorage for unauthenticated walkthroughs
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
-                {previewChores.map((chore, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 16px',
-                    borderBottom: i < previewChores.length - 1 ? '1px solid #F7F8FA' : 'none',
+          {/* ── Chores by person ─────────────────────────────────────────────── */}
+          {(() => {
+            const isPreview = householdAllChores.length === 0 && previewChores.length > 0
+
+            // ── preview path ─────────────────────────────────────────────────
+            if (isPreview) {
+              const myChores   = previewChores.filter(c => c.assignTo === 'me')
+              const unassigned = previewChores.filter(c => c.assignTo === 'unassigned')
+              // One section per named roommate
+              const roommates  = [...new Set(
+                previewChores
+                  .filter(c => c.assignTo !== 'me' && c.assignTo !== 'unassigned')
+                  .map(c => c.assignTo)
+              )]
+
+              const renderPreviewGroup = (
+                label: string,
+                chores: PreviewChore[],
+                accent: string,
+                isYou: boolean,
+              ) => chores.length === 0 ? null : (
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{
+                    fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+                    textTransform: 'uppercase', color: accent,
+                    margin: '0 0 6px', paddingLeft: 2,
                   }}>
-                    <span style={{ fontSize: 20, flexShrink: 0 }}>{chore.emoji}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, fontSize: 13, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {chore.name}
-                      </p>
-                      {chore.assignTo && chore.assignTo !== 'unassigned' && (
-                        <p style={{ fontSize: 11, color: '#9CA3AF', margin: '2px 0 0' }}>
-                          {chore.assignTo === 'me' ? 'You' : chore.assignTo} · {chore.freq}
-                        </p>
-                      )}
-                    </div>
-                    {chore.points > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0 }}>
-                        {chore.points} pts
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : householdAllChores.length === 0 ? (
-              <div style={{
-                background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
-                padding: '24px 20px', textAlign: 'center',
-              }}>
-                <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
-                  No chores set up yet — complete onboarding to add chores.
-                </p>
-              </div>
-            ) : (
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' }}>
-                {householdAllChores.map((chore, i) => {
-                  const catMeta = (CATEGORY_META as Record<string, { emoji: string }>)[chore.category] ?? { emoji: '🏠' }
-                  const isDone  = chore.status === 'complete'
-                  return (
-                    <div
-                      key={chore.id}
-                      style={{
+                    {isYou ? '👤 ' : ''}{label}
+                  </p>
+                  <div style={{ background: '#fff', borderRadius: 14, border: `1.5px solid ${isYou ? '#FFD5C2' : '#F0F0F0'}`, overflow: 'hidden' }}>
+                    {chores.map((chore, i) => (
+                      <div key={i} style={{
                         display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 16px',
-                        borderBottom: i < householdAllChores.length - 1 ? '1px solid #F7F8FA' : 'none',
-                      }}
-                    >
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{catMeta.emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                        padding: '11px 14px',
+                        borderBottom: i < chores.length - 1 ? '1px solid #F7F8FA' : 'none',
+                        background: isYou ? '#FFFAF8' : '#fff',
+                      }}>
+                        <span style={{ fontSize: 19, flexShrink: 0 }}>{chore.emoji}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, fontSize: 13, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {chore.name}
+                          </p>
+                          <p style={{ fontSize: 11, color: '#9CA3AF', margin: '1px 0 0', textTransform: 'capitalize' }}>
+                            {chore.freq}
+                          </p>
+                        </div>
+                        {chore.points > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0 }}>
+                            {chore.points} pts
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+
+              return (
+                <section style={{ marginBottom: 20 }}>
+                  <SectionTitle icon="📋" label="Chores" color="#374151" />
+                  {renderPreviewGroup('Your chores', myChores, '#FF6B2B', true)}
+                  {roommates.map(name => renderPreviewGroup(
+                    `${name}'s chores`,
+                    previewChores.filter(c => c.assignTo === name),
+                    '#6B7280', false,
+                  ))}
+                  {renderPreviewGroup('Unassigned', unassigned, '#9CA3AF', false)}
+                </section>
+              )
+            }
+
+            // ── real DB path ─────────────────────────────────────────────────
+            if (householdAllChores.length === 0) return (
+              <section style={{ marginBottom: 20 }}>
+                <SectionTitle icon="📋" label="Chores" color="#374151" />
+                <div style={{
+                  background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
+                  padding: '24px 20px', textAlign: 'center',
+                }}>
+                  <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
+                    No chores set up yet — complete onboarding to add chores.
+                  </p>
+                </div>
+              </section>
+            )
+
+            const myRealChores    = householdAllChores.filter(c => c.assigned_to === currentUser.id)
+            const othersChores    = householdAllChores.filter(c => c.assigned_to && c.assigned_to !== currentUser.id)
+            const unassignedReal  = householdAllChores.filter(c => !c.assigned_to)
+            const roommateNames   = [...new Set(othersChores.map(c => c.assigneeName).filter(Boolean))] as string[]
+
+            const renderRealGroup = (
+              label: string,
+              chores: typeof householdAllChores,
+              accent: string,
+              isYou: boolean,
+            ) => chores.length === 0 ? null : (
+              <div style={{ marginBottom: 12 }}>
+                <p style={{
+                  fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+                  textTransform: 'uppercase', color: accent,
+                  margin: '0 0 6px', paddingLeft: 2,
+                }}>
+                  {isYou ? '👤 ' : ''}{label}
+                </p>
+                <div style={{ background: '#fff', borderRadius: 14, border: `1.5px solid ${isYou ? '#FFD5C2' : '#F0F0F0'}`, overflow: 'hidden' }}>
+                  {chores.map((chore, i) => {
+                    const catMeta = (CATEGORY_META as Record<string, { emoji: string }>)[chore.category] ?? { emoji: '🏠' }
+                    const isDone  = chore.status === 'complete'
+                    return (
+                      <div key={chore.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '11px 14px',
+                        borderBottom: i < chores.length - 1 ? '1px solid #F7F8FA' : 'none',
+                        background: isYou ? '#FFFAF8' : '#fff',
+                        opacity: isDone ? 0.55 : 1,
+                      }}>
+                        <span style={{ fontSize: 19, flexShrink: 0 }}>{catMeta.emoji}</span>
                         <p style={{
                           fontFamily: '"Poppins", sans-serif', fontWeight: 600, fontSize: 13,
-                          color: isDone ? '#9CA3AF' : '#111827', margin: 0,
+                          color: '#111827', margin: 0, flex: 1,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           textDecoration: isDone ? 'line-through' : 'none',
                         }}>
                           {chore.name}
                         </p>
-                        {chore.assigneeName && (
-                          <p style={{ fontSize: 11, color: '#9CA3AF', margin: '2px 0 0' }}>
-                            {chore.assigneeName}
-                          </p>
+                        {chore.points > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0 }}>
+                            {chore.points} pts
+                          </span>
                         )}
-                      </div>
-                      {chore.points > 0 && (
                         <span style={{
-                          fontSize: 11, fontWeight: 700, color: '#B45309',
-                          background: '#FFFBEB', borderRadius: 99, padding: '2px 7px', flexShrink: 0,
+                          fontSize: 11, fontWeight: 700, flexShrink: 0,
+                          borderRadius: 99, padding: '3px 9px',
+                          background: isDone ? '#D1FAE5' : '#F3F4F6',
+                          color: isDone ? '#059669' : '#6B7280',
                         }}>
-                          {chore.points} pts
+                          {isDone ? '✓' : 'Pending'}
                         </span>
-                      )}
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, flexShrink: 0,
-                        borderRadius: 99, padding: '3px 9px',
-                        background: isDone ? '#D1FAE5' : '#F3F4F6',
-                        color: isDone ? '#059669' : '#6B7280',
-                      }}>
-                        {isDone ? '✓ Done' : 'Pending'}
-                      </span>
-                    </div>
-                  )
-                })}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            )}
-          </section>
+            )
+
+            return (
+              <section style={{ marginBottom: 20 }}>
+                <SectionTitle icon="📋" label="Chores" color="#374151" />
+                {renderRealGroup('Your chores', myRealChores, '#FF6B2B', true)}
+                {roommateNames.map(name => renderRealGroup(
+                  `${name}'s chores`,
+                  othersChores.filter(c => c.assigneeName === name),
+                  '#6B7280', false,
+                ))}
+                {renderRealGroup('Unassigned', unassignedReal, '#9CA3AF', false)}
+              </section>
+            )
+          })()}
+
 
           {/* ── Chat CTA (when no activity yet) ──────────────────────────────── */}
           {todayChores.length === 0 && overdueChores.length === 0 && recentActivity.length === 0 && (
