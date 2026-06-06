@@ -446,7 +446,8 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
                   type="button"
                   onClick={() => {
                     clearError()
-                    setStep('admin-name') // TODO: restore auth gate: if (!isLoggedIn) { setPendingPath('create'); setStep('sign-in') }
+                    if (!isLoggedIn) { setPendingPath('create'); setStep('sign-in') }
+                    else setStep('admin-name')
                   }}
                   style={{
                     background: '#FF6B2B', border: 'none', borderRadius: 18,
@@ -471,7 +472,8 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
                   type="button"
                   onClick={() => {
                     clearError()
-                    setStep('join') // TODO: restore auth gate: if (!isLoggedIn) { setPendingPath('join'); setStep('sign-in') }
+                    if (!isLoggedIn) { setPendingPath('join'); setStep('sign-in') }
+                    else setStep('join')
                   }}
                   style={{
                     background: '#fff', border: '2px solid #E5E7EB',
