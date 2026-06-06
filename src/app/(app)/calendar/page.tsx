@@ -11,7 +11,7 @@ export default async function CalendarPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/onboarding')
+  if (!user) redirect('/login?redirectTo=/calendar')
 
   const [{ data: _profile }, { data: membership }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),

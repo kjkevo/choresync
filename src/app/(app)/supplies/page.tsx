@@ -15,7 +15,7 @@ export default async function SuppliesPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/onboarding')
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('household_members')

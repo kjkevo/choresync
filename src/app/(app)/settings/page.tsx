@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/onboarding')
+  if (!user) redirect('/login')
 
   // ── Profile + membership ──────────────────────────────────────────────────
   const [{ data: profile }, { data: membership }] = await Promise.all([
