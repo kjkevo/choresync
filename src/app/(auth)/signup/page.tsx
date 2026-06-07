@@ -1,6 +1,7 @@
-import { permanentRedirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
-// /signup is not the canonical route — all signup happens at /login?tab=signup
+// Signup screen disabled — all entry points go to onboarding.
+// TODO: re-enable before launch
 export default function SignupPage() {
-  permanentRedirect('/login?tab=signup')
+  redirect('/onboarding')
 }
