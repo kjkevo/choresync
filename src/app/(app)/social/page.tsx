@@ -19,7 +19,26 @@ export default async function SocialPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   // if (!user) redirect('/login') // TODO: re-enable
-  if (!user) redirect('/onboarding')
+  if (!user) {
+    const guest: UserRow = {
+      id: '', email: '', full_name: 'Guest', avatar_url: null,
+      username: null, tagline: null, google_calendar_refresh_token: null,
+      created_at: '', updated_at: '',
+    }
+    return (
+      <SocialClient
+        currentUser={guest}
+        currentUserId=""
+        householdId=""
+        householdName="Your Household"
+        isAdmin={false}
+        initialMessages={[]}
+        announcements={[]}
+        members={[]}
+        colorMap={{}}
+      />
+    )
+  }
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([

@@ -27,7 +27,32 @@ export default async function DashboardPage({
   const { data: { user } } = await supabase.auth.getUser()
 
   // if (!user) redirect('/login') // TODO: re-enable
-  if (!user) redirect('/onboarding')
+  // Guest mode — render the dashboard shell; DashboardClient hydrates
+  // members + chores from sessionStorage preview data after onboarding.
+  if (!user) {
+    const guest: UserRow = {
+      id: '', email: '', full_name: 'Guest', avatar_url: null,
+      username: null, tagline: null, google_calendar_refresh_token: null,
+      created_at: '', updated_at: '',
+    }
+    return (
+      <DashboardClient
+        currentUser={guest}
+        myOverdueChores={[]}
+        myTodayChores={[]}
+        householdName="Your Household"
+        householdId=""
+        colorMap={{}}
+        myStreak={null}
+        pinnedAnnouncements={[]}
+        recentActivity={[]}
+        allHouseholds={[]}
+        householdAllChores={[]}
+        leaderboard={[]}
+        members={[]}
+      />
+    )
+  }
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([
@@ -38,7 +63,7 @@ export default async function DashboardPage({
   ])
   const profile = profileRaw as UserRow | null
 
-  // Fix #2: must belong to a household; otherwise run onboarding.
+  // No household yet — redirect to onboarding to set one up
   if (!allMemberships || allMemberships.length === 0) redirect('/onboarding')
 
   // Pick active household: prefer ?h= param, else first membership
