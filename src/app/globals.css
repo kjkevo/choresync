@@ -288,3 +288,26 @@ html.high-contrast :focus-visible {
     min-width:  44px;
   }
 }
+
+/* ── 9:16 app frame ────────────────────────────────────────────────────────── */
+/* On mobile: fill the entire screen, no black bars */
+@media (max-width: 430px) {
+  #app-frame {
+    max-width: 100% !important;
+    aspect-ratio: unset !important;
+    min-height: 100dvh !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}
+/* On desktop: center the 9:16 frame with a rounded phone look */
+@media (min-width: 431px) {
+  #app-frame {
+    margin-top: 20px !important;
+    margin-bottom: 20px !important;
+    border-radius: 32px !important;
+    min-height: calc(430px * 16 / 9) !important;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto !important;
+  }
+}

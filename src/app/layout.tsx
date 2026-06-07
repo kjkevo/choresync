@@ -46,8 +46,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className="antialiased">
-        {children}
+      <body className="antialiased" style={{ margin: 0, background: '#000' }}>
+        {/* 9:16 phone frame — centers the app in a portrait ratio container */}
+        <div id="app-frame" style={{
+          width: '100%',
+          maxWidth: 430,
+          minHeight: '100dvh',
+          aspectRatio: '9 / 16',
+          margin: '0 auto',
+          background: '#F7F8FA',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 0 60px rgba(0,0,0,0.3)',
+        }}>
+          {children}
+        </div>
       </body>
     </html>
   )
