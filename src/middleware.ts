@@ -30,13 +30,13 @@ export async function middleware(request: NextRequest) {
   const isPublic = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
   if (isPublic) return response
 
-  // Unauthenticated requests to any app route → send to login
-  if (!user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(url)
-  }
+  // TODO: re-enable before launch
+  // if (!user) {
+  //   const url = request.nextUrl.clone()
+  //   url.pathname = '/login'
+  //   url.searchParams.set('redirectTo', pathname)
+  //   return NextResponse.redirect(url)
+  // }
 
   return response
 }

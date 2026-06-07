@@ -11,8 +11,8 @@ export default async function ChoresPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login?redirectTo=/chores')
-
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
   // ── 1. Caller's household membership ─────────────────────────────────────
   const { data: membership } = await supabase
     .from('household_members')

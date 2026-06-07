@@ -11,8 +11,8 @@ export default async function QuickPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
   const { data: membership } = await supabase
     .from('household_members')
     .select('household_id')

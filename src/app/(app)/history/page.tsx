@@ -120,8 +120,8 @@ export default async function HistoryPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profile }, { data: membership }] = await Promise.all([
     supabase.from('users').select('id, full_name, avatar_url, email').eq('id', user.id).maybeSingle(),

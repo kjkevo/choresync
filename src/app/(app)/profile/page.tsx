@@ -16,8 +16,8 @@ export default async function ProfilePage({
   const { data: { user } } = await supabase.auth.getUser()
   const { gcal } = await searchParams
 
-  // Auth gate — redirect to login
-  if (!user) redirect('/login?redirectTo=/profile')
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
 
   // ── 1. Profile ────────────────────────────────────────────────────────────
   const { data: profile } = await supabase

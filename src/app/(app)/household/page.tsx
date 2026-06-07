@@ -16,8 +16,8 @@ export default async function HouseholdPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect('/dashboard')
-
+  // if (!user) redirect('/dashboard') // TODO: re-enable
+  if (!user) redirect('/onboarding')
   // ── 1. Caller's own membership ────────────────────────────────────────────
   const { data: myMembership } = await supabase
     .from('household_members')

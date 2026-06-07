@@ -18,8 +18,8 @@ export default async function SocialPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fix #11: real auth gate — no guest chat
-  if (!user) redirect('/login?redirectTo=/social')
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
 
   // ── 1. Profile + membership ───────────────────────────────────────────────
   const [{ data: profileRaw }, { data: membership }] = await Promise.all([

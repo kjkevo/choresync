@@ -26,8 +26,8 @@ export default async function DashboardPage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fix #1: real auth gate. No session → /login (preview bypass removed).
-  if (!user) redirect('/login?redirectTo=/dashboard')
+  // if (!user) redirect('/login') // TODO: re-enable
+  if (!user) redirect('/onboarding')
 
   // ── 1. Profile + ALL memberships ─────────────────────────────────────────
   const [{ data: profileRaw }, { data: allMemberships }] = await Promise.all([
