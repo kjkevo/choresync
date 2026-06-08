@@ -478,38 +478,6 @@ export default function DashboardClient({
             </section>
           )}
 
-          {/* ── Today ────────────────────────────────────────────────────────── */}
-          <section style={{ marginBottom: 20 }}>
-            <SectionTitle icon="📋" label={t('dueToday')} count={todayChores.length} color="#FF6B2B" />
-            {todayChores.length === 0 ? (
-              householdAllChores.length > 0 ? null : (
-                <div style={{
-                  background: '#fff', borderRadius: 16, border: '1.5px dashed #E5E7EB',
-                  padding: '24px 20px', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
-                  <p style={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: 14, color: '#374151', margin: 0 }}>
-                    No chores due today
-                  </p>
-                </div>
-              )
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {todayChores.map(chore => (
-                  <ChoreCard
-                    key={chore.id}
-                    chore={chore}
-                    variant="today"
-                    pending={quickPending.has(chore.id)}
-                    onQuickComplete={() => handleQuickComplete(chore)}
-                    onDone={() => setCompleteSheet(chore)}
-                    markDoneLabel={t('markDone')}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
           {/* ── Members (moved above chores) ─────────────────────────────────── */}
           {(members.length > 0 || previewMembers.length > 0) && (
             <section style={{ marginBottom: 20 }}>
@@ -561,9 +529,12 @@ export default function DashboardClient({
             if (isPreview) {
               // Group by pre-resolved displayAssignTo name.
               // Preserve member order: admin (isMe) first, then roommates in order.
-              const memberOrder    = previewMembers.map(m => m.name ?? '').filter(Boolean)
-              const isManual       = previewRotationType === 'manual-completion'
-              const myName         = previewMembers.find(m => m.isMe)?.name ?? ''
+              const memberOrder = previewMembers.map(m => m.name ?? '').filter(Boolean)
+              const myName      = previewMembers.find(m => m.isMe)?.name ?? ''
+              // Default to manual-completion semantics when rotationType is
+              // empty (e.g. sessionStorage was set before rotationType was
+              // being saved, or user never went through full onboarding).
+              const canComplete = previewRotationType === '' || previewRotationType === 'manual-completion'
 
               const renderPreviewGroup = (
                 label: string,
@@ -601,8 +572,8 @@ export default function DashboardClient({
                             {chore.points} pts
                           </span>
                         )}
-                        {/* Complete button — Manual Completion only, only on YOUR chores */}
-                        {isManual && isYou && (
+                        {/* Complete button — only on YOUR chores */}
+                        {canComplete && isYou && (
                           <button
                             type="button"
                             onClick={() => completePreviewChore(idx)}
@@ -631,7 +602,7 @@ export default function DashboardClient({
               return (
                 <section style={{ marginBottom: 20 }}>
                   <SectionTitle icon="📋" label="Chores" color="#374151" />
-                  {isManual && myName && (
+                  {canComplete && myName && (
                     <p style={{
                       fontSize: 11, color: '#9CA3AF', margin: '0 0 10px', paddingLeft: 2,
                       lineHeight: 1.5,
