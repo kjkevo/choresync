@@ -217,6 +217,37 @@ export default function DashboardClient({
   }, {})
   const totalPoints = previewChores.reduce((s, c) => s + c.points, 0)
 
+  // Manual-Completion handler — advance the chore to the next person in
+  // the rotation, then persist to sessionStorage so the change survives
+  // page reloads and other tabs (chat, profile) see the same state.
+  const completePreviewChore = useCallback((choreIdx: number) => {
+    setPreviewChores(prev => {
+      const updated = prev.slice()
+      const chore   = updated[choreIdx]
+      if (!chore) return prev
+
+      // Resolve the rotation order (admin first then roommates, in member order)
+      const order = previewMembers.map(m => m.name ?? '').filter(Boolean)
+      if (order.length === 0) return prev
+
+      const currentIdx = order.indexOf(chore.displayAssignTo)
+      const nextIdx    = currentIdx === -1 ? 0 : (currentIdx + 1) % order.length
+      updated[choreIdx] = { ...chore, displayAssignTo: order[nextIdx] }
+
+      // Persist
+      try {
+        const raw = sessionStorage.getItem('cs_preview_onboarding')
+        if (raw) {
+          const data = JSON.parse(raw) as { chores?: PreviewChore[] }
+          data.chores = updated
+          sessionStorage.setItem('cs_preview_onboarding', JSON.stringify(data))
+        }
+      } catch { /* ignore */ }
+
+      return updated
+    })
+  }, [previewMembers])
+
   const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
   const totalPending = overdueChores.length + todayChores.length
 
@@ -530,11 +561,13 @@ export default function DashboardClient({
             if (isPreview) {
               // Group by pre-resolved displayAssignTo name.
               // Preserve member order: admin (isMe) first, then roommates in order.
-              const memberOrder = previewMembers.map(m => m.name ?? '')
+              const memberOrder    = previewMembers.map(m => m.name ?? '').filter(Boolean)
+              const isManual       = previewRotationType === 'manual-completion'
+              const myName         = previewMembers.find(m => m.isMe)?.name ?? ''
 
               const renderPreviewGroup = (
                 label: string,
-                chores: PreviewChore[],
+                chores: { c: PreviewChore; idx: number }[],
                 accent: string,
                 isYou: boolean,
               ) => chores.length === 0 ? null : (
@@ -547,8 +580,8 @@ export default function DashboardClient({
                     {isYou ? '👤 ' : ''}{label}
                   </p>
                   <div style={{ background: '#fff', borderRadius: 14, border: `1.5px solid ${isYou ? '#FFD5C2' : '#F0F0F0'}`, overflow: 'hidden' }}>
-                    {chores.map((chore, i) => (
-                      <div key={i} style={{
+                    {chores.map(({ c: chore, idx }, i) => (
+                      <div key={idx} style={{
                         display: 'flex', alignItems: 'center', gap: 12,
                         padding: '11px 14px',
                         borderBottom: i < chores.length - 1 ? '1px solid #F7F8FA' : 'none',
@@ -568,6 +601,27 @@ export default function DashboardClient({
                             {chore.points} pts
                           </span>
                         )}
+                        {/* Complete button — Manual Completion only, only on YOUR chores */}
+                        {isManual && isYou && (
+                          <button
+                            type="button"
+                            onClick={() => completePreviewChore(idx)}
+                            style={{
+                              flexShrink: 0,
+                              background: '#10B981', color: '#fff',
+                              border: 'none', borderRadius: 8,
+                              padding: '6px 12px',
+                              fontSize: 11, fontWeight: 800,
+                              cursor: 'pointer',
+                              fontFamily: '"Nunito", sans-serif',
+                              display: 'flex', alignItems: 'center', gap: 4,
+                              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+                            }}
+                            aria-label={`Mark ${chore.name} complete`}
+                          >
+                            ✓ Done
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -577,10 +631,20 @@ export default function DashboardClient({
               return (
                 <section style={{ marginBottom: 20 }}>
                   <SectionTitle icon="📋" label="Chores" color="#374151" />
+                  {isManual && myName && (
+                    <p style={{
+                      fontSize: 11, color: '#9CA3AF', margin: '0 0 10px', paddingLeft: 2,
+                      lineHeight: 1.5,
+                    }}>
+                      Tap <span style={{ background: '#10B981', color: '#fff', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>✓ Done</span> on a chore to pass it to the next person.
+                    </p>
+                  )}
                   {memberOrder.map(memberName => {
                     const m       = previewMembers.find(pm => (pm.name ?? '') === memberName)
                     const isYou   = !!(m as PreviewMember | undefined)?.isMe
-                    const section = previewChores.filter(c => c.displayAssignTo === memberName)
+                    const section = previewChores
+                      .map((c, idx) => ({ c, idx }))
+                      .filter(({ c }) => c.displayAssignTo === memberName)
                     const label   = isYou ? 'Your chores' : `${memberName}'s chores`
                     return renderPreviewGroup(label, section, isYou ? '#FF6B2B' : '#6B7280', isYou)
                   })}
