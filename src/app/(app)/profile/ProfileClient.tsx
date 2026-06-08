@@ -109,6 +109,17 @@ export default function ProfileClient({
   // Appearance is a local-only display preference (no DB column needed)
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system')
 
+  // Guest-mode avatar — when no real session, stored as data URL in localStorage
+  // so the user can pick a photo immediately without signing up
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (user.id) return    // real user — DB is the source of truth
+    try {
+      const cached = localStorage.getItem('cs_guest_avatar')
+      if (cached) setGuestAvatarUrl(cached)
+    } catch { /* ignore */ }
+  }, [user.id])
+
   // ── Preview onboarding hydration (sessionStorage) ─────────────────────────
   // When there's no real session/household, pull what the user entered during
   // the onboarding walkthrough so the profile reflects their choices instead
@@ -279,7 +290,8 @@ export default function ProfileClient({
   // sessionStorage when there is no real session (so users can see their own
   // onboarding choices reflected back on the profile).
   const displayName   = profile?.full_name ?? user.email ?? preview?.adminName ?? 'Guest'
-  const rawAvatarUrl  = profile?.avatar_url ?? null
+  // Real DB avatar takes priority; fall back to guest-mode photo from localStorage
+  const rawAvatarUrl  = profile?.avatar_url ?? guestAvatarUrl ?? null
   const isEmojiAvatar = rawAvatarUrl?.startsWith('emoji:')
   const currentEmoji  = isEmojiAvatar ? rawAvatarUrl!.slice(6) : null
   const photoUrl      = !isEmojiAvatar ? rawAvatarUrl : null
@@ -351,6 +363,44 @@ export default function ProfileClient({
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { setErrorMsg('File must be under 5 MB'); return }
     setUploading(true)
+
+    // Guest mode (no real session) — save as data URL locally so the user
+    // can still see their photo. Will not persist across browsers/devices
+    // until they sign up.
+    const isGuest = !user.id
+    if (isGuest) {
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload  = () => resolve(reader.result as string)
+          reader.onerror = () => reject(reader.error)
+          reader.readAsDataURL(file)
+        })
+        localStorage.setItem('cs_guest_avatar', dataUrl)
+        setGuestAvatarUrl(dataUrl)
+        // Also propagate into the preview onboarding so the dashboard
+        // members section + leaderboard use it.
+        try {
+          const raw = sessionStorage.getItem('cs_preview_onboarding')
+          if (raw) {
+            const data = JSON.parse(raw) as { members?: { isMe?: boolean; avatarUrl?: string | null }[] }
+            if (Array.isArray(data.members)) {
+              data.members = data.members.map(m => m.isMe ? { ...m, avatarUrl: dataUrl } : m)
+              sessionStorage.setItem('cs_preview_onboarding', JSON.stringify(data))
+            }
+          }
+        } catch { /* ignore */ }
+        setSuccessMsg('Photo updated!')
+        setEditModal(null)
+      } catch {
+        setErrorMsg('Could not read that image. Try a different file.')
+      } finally {
+        setUploading(false)
+      }
+      return
+    }
+
+    // Real user — upload to Supabase Storage
     const fd = new FormData()
     fd.append('avatar', file)
     const r = await uploadAvatar(fd)

@@ -160,6 +160,17 @@ export default function DashboardClient({
   const [switcherOpen,   setSwitcherOpen]   = useState(false)
   const [, startTransition]                 = useTransition()
 
+  // Guest-mode avatar (data URL) — used in the header circle when there's
+  // no real session. Set in /profile via the photo upload modal.
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (currentUser.id) return
+    try {
+      const cached = localStorage.getItem('cs_guest_avatar')
+      if (cached) setGuestAvatarUrl(cached)
+    } catch { /* ignore */ }
+  }, [currentUser.id])
+
   // ── Preview onboarding data (sessionStorage, for unauthenticated walkthroughs) ──
   const [previewHouseholdName, setPreviewHouseholdName] = useState('')
   const [previewAdminName,     setPreviewAdminName]     = useState('')
@@ -339,7 +350,17 @@ export default function DashboardClient({
               </>
             )}
 
-            <AvatarCircle user={currentUser} color={colorMap[currentUser.id]} size={32} />
+            <AvatarCircle
+              user={
+                // Hydrate guest avatar from localStorage so the header circle
+                // shows the photo the user just uploaded in /profile
+                currentUser.id || !guestAvatarUrl
+                  ? currentUser
+                  : { ...currentUser, avatar_url: guestAvatarUrl }
+              }
+              color={colorMap[currentUser.id]}
+              size={32}
+            />
           </div>
         </header>
 
