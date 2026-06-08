@@ -3,10 +3,9 @@
 import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home',     icon: <HomeIcon />     },
-  { href: '/social',    label: 'Chat',     icon: <ChatIcon />     },
-  { href: '/calendar',  label: 'Calendar', icon: <CalendarIcon /> },
-  { href: '/profile',   label: 'Profile',  icon: <PersonIcon />   },
+  { href: '/dashboard', label: 'Home',    icon: <HomeIcon />   },
+  { href: '/social',    label: 'Chat',    icon: <ChatIcon />   },
+  { href: '/profile',   label: 'Profile', icon: <PersonIcon /> },
 ] as const
 
 export default function BottomNav() {
@@ -14,7 +13,10 @@ export default function BottomNav() {
 
   return (
     <nav style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+      // Sticky so it scrolls with the phone frame and stays inside it
+      // (was position:fixed which spanned the full viewport ignoring the frame)
+      position: 'sticky', bottom: 0, zIndex: 50,
+      width: '100%',
       background: '#fff', borderTop: '1px solid #F0F0F0',
       display: 'flex', alignItems: 'stretch',
       height: 68,

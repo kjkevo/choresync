@@ -389,7 +389,7 @@ export default function ProfileClient({
     return (
       <>
         <style>{FONTS}</style>
-        <div style={{ minHeight: '100dvh', background: '#F2F2F7', fontFamily: '"Nunito", sans-serif', paddingBottom: 88 }}>
+        <div style={{ minHeight: '100dvh', background: '#F2F2F7', fontFamily: '"Nunito", sans-serif', paddingBottom: 0 }}>
           <div style={{
             position: 'sticky', top: 0, zIndex: 40, background: '#fff',
             borderBottom: '1px solid #F0F0F0', padding: '0 16px', height: 52,
@@ -419,7 +419,7 @@ export default function ProfileClient({
   return (
     <>
       <style>{FONTS}</style>
-      <div style={{ minHeight: '100dvh', background: '#F2F2F7', fontFamily: '"Nunito", sans-serif', paddingBottom: 88 }}>
+      <div style={{ minHeight: '100dvh', background: '#F2F2F7', fontFamily: '"Nunito", sans-serif', paddingBottom: 0 }}>
 
         {/* ── Top bar — matches mockup ─────────────────────────────────────── */}
         <div style={{

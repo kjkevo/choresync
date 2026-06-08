@@ -252,7 +252,7 @@ export default function DashboardClient({
     <>
       <style>{FONTS}</style>
 
-      <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: '"Nunito", sans-serif', paddingBottom: 80 }}>
+      <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: '"Nunito", sans-serif' }}>
 
         {/* ── Top bar ──────────────────────────────────────────────────────── */}
         <header style={{
@@ -352,7 +352,12 @@ export default function DashboardClient({
               fontFamily: '"Poppins", sans-serif', fontWeight: 800,
               fontSize: 25, color: '#111827', margin: 0, letterSpacing: '-0.4px',
             }}>
-              {t(greetingKey())}, {currentUser.full_name?.split(' ')[0] ?? 'there'} 👋
+              {t(greetingKey())}, {
+                (currentUser.full_name && currentUser.full_name !== 'Guest'
+                  ? currentUser.full_name
+                  : previewAdminName || 'there'
+                ).split(' ')[0]
+              } 👋
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
               <p style={{ margin: 0, fontSize: 14, color: '#6B7280' }}>
@@ -452,87 +457,6 @@ export default function DashboardClient({
               </div>
             )}
           </section>
-
-          {/* ── Household Setup Summary (preview only) ───────────────────────── */}
-          {!householdId && (previewHouseholdName || previewMembers.length > 0) && (
-            <section style={{ marginBottom: 20 }}>
-              <SectionTitle icon="📋" label="Your Setup" color="#374151" />
-              <div style={{
-                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
-                overflow: 'hidden',
-              }}>
-                {/* Room */}
-                <SetupRow
-                  icon="🏠" iconBg="#E6F1FB" iconFg="#185FA5"
-                  label="Room"
-                  value={previewHouseholdName || '—'}
-                />
-                {/* You */}
-                {previewAdminName && (
-                  <SetupRow
-                    icon="👤" iconBg="#FFF3EE" iconFg="#FF6B2B"
-                    label="You"
-                    value={`${previewAdminName} · Admin`}
-                  />
-                )}
-                {/* People */}
-                <SetupRow
-                  icon="👥" iconBg="#EEEDFE" iconFg="#534AB7"
-                  label="People"
-                  value={`${previewMembers.length} member${previewMembers.length !== 1 ? 's' : ''}`}
-                  sub={previewMembers.map(m => m.name).filter(Boolean).join(' · ')}
-                />
-                {/* Chores */}
-                <SetupRow
-                  icon="📋" iconBg="#FAEEDA" iconFg="#854F0B"
-                  label="Chores"
-                  value={`${previewChores.length} chore${previewChores.length !== 1 ? 's' : ''} · ${totalPoints} pts total`}
-                />
-                {/* Details — frequency breakdown */}
-                {Object.keys(choresByFreq).length > 0 && (
-                  <SetupRow
-                    icon="⚙️" iconBg="#E1F5EE" iconFg="#0F6E56"
-                    label="Details"
-                    value={Object.entries(choresByFreq)
-                      .map(([f, n]) => `${n} ${f}`)
-                      .join(' · ')}
-                  />
-                )}
-                {/* Rotation */}
-                {rotationMeta && (
-                  <SetupRow
-                    icon={rotationMeta.emoji} iconBg="#FBEAF0" iconFg="#993556"
-                    label="Rotation"
-                    value={rotationMeta.label}
-                    sub={rotationMeta.desc}
-                    isLast
-                  />
-                )}
-              </div>
-
-              {/* Rotation order chips — only for Admin's Word */}
-              {previewRotationType === 'admin-approval' && previewRotationOrder.length > 0 && (
-                <div style={{ marginTop: 10, padding: '12px 14px', background: '#FFF8F5', borderRadius: 14, border: '1px solid #FFD5C2' }}>
-                  <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: '#FF6B2B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Rotation Order
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {previewRotationOrder.map((name, i) => (
-                      <span key={i} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: '#fff', border: '1.5px solid #FFD5C2',
-                        borderRadius: 99, padding: '3px 10px',
-                        fontSize: 12, fontWeight: 700, color: '#FF6B2B',
-                      }}>
-                        <span style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 800 }}>{i + 1}.</span>
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
 
           {/* ── Members (moved above chores) ─────────────────────────────────── */}
           {(members.length > 0 || previewMembers.length > 0) && (

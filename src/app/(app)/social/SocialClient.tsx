@@ -185,8 +185,7 @@ export default function SocialClient({
           )}
         </div>
 
-        {/* Spacer for fixed BottomNav */}
-        <div style={{ height: 68, flexShrink: 0 }} />
+        {/* BottomNav is now sticky inside the frame — no spacer needed */}
       </div>
 
       <BottomNav />
