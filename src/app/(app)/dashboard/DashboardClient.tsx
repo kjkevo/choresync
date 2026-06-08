@@ -162,8 +162,11 @@ export default function DashboardClient({
 
   // ── Preview onboarding data (sessionStorage, for unauthenticated walkthroughs) ──
   const [previewHouseholdName, setPreviewHouseholdName] = useState('')
-  const [previewMembers,  setPreviewMembers]  = useState<PreviewMember[]>([])
-  const [previewChores,   setPreviewChores]   = useState<PreviewChore[]>([])
+  const [previewAdminName,     setPreviewAdminName]     = useState('')
+  const [previewMembers,       setPreviewMembers]       = useState<PreviewMember[]>([])
+  const [previewChores,        setPreviewChores]        = useState<PreviewChore[]>([])
+  const [previewRotationType,  setPreviewRotationType]  = useState<string>('')
+  const [previewRotationOrder, setPreviewRotationOrder] = useState<string[]>([])
 
   useEffect(() => {
     if (householdId) return  // real household — don't override
@@ -172,14 +175,36 @@ export default function DashboardClient({
       if (!raw) return
       const data = JSON.parse(raw) as {
         name: string
+        adminName?: string
         members: PreviewMember[]
         chores: PreviewChore[]
+        rotationType?: string
+        rotationOrder?: string[]
       }
       setPreviewHouseholdName(data.name ?? '')
+      setPreviewAdminName(data.adminName ?? '')
       setPreviewMembers(data.members ?? [])
       setPreviewChores(data.chores ?? [])
+      setPreviewRotationType(data.rotationType ?? '')
+      setPreviewRotationOrder(data.rotationOrder ?? [])
     } catch { /* ignore */ }
   }, [householdId])
+
+  // Map rotation type ID → display label + emoji
+  const rotationMeta = previewRotationType === 'admin-approval'
+    ? { emoji: '👑', label: "Admin's Word",         desc: 'Admin approves photos; admin sets the order' }
+    : previewRotationType === 'ai-detection'
+      ? { emoji: '🤖', label: 'AI Completion Detection', desc: 'AI verifies completion photos' }
+      : previewRotationType === 'manual-completion'
+        ? { emoji: '✅', label: 'Manual Completion', desc: 'Auto-advances to the next person' }
+        : null
+
+  // Aggregate stats from preview chores
+  const choresByFreq = previewChores.reduce<Record<string, number>>((acc, c) => {
+    acc[c.freq] = (acc[c.freq] ?? 0) + 1
+    return acc
+  }, {})
+  const totalPoints = previewChores.reduce((s, c) => s + c.points, 0)
 
   const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
   const totalPending = overdueChores.length + todayChores.length
@@ -427,6 +452,87 @@ export default function DashboardClient({
               </div>
             )}
           </section>
+
+          {/* ── Household Setup Summary (preview only) ───────────────────────── */}
+          {!householdId && (previewHouseholdName || previewMembers.length > 0) && (
+            <section style={{ marginBottom: 20 }}>
+              <SectionTitle icon="📋" label="Your Setup" color="#374151" />
+              <div style={{
+                background: '#fff', borderRadius: 16, border: '1px solid #F0F0F0',
+                overflow: 'hidden',
+              }}>
+                {/* Room */}
+                <SetupRow
+                  icon="🏠" iconBg="#E6F1FB" iconFg="#185FA5"
+                  label="Room"
+                  value={previewHouseholdName || '—'}
+                />
+                {/* You */}
+                {previewAdminName && (
+                  <SetupRow
+                    icon="👤" iconBg="#FFF3EE" iconFg="#FF6B2B"
+                    label="You"
+                    value={`${previewAdminName} · Admin`}
+                  />
+                )}
+                {/* People */}
+                <SetupRow
+                  icon="👥" iconBg="#EEEDFE" iconFg="#534AB7"
+                  label="People"
+                  value={`${previewMembers.length} member${previewMembers.length !== 1 ? 's' : ''}`}
+                  sub={previewMembers.map(m => m.name).filter(Boolean).join(' · ')}
+                />
+                {/* Chores */}
+                <SetupRow
+                  icon="📋" iconBg="#FAEEDA" iconFg="#854F0B"
+                  label="Chores"
+                  value={`${previewChores.length} chore${previewChores.length !== 1 ? 's' : ''} · ${totalPoints} pts total`}
+                />
+                {/* Details — frequency breakdown */}
+                {Object.keys(choresByFreq).length > 0 && (
+                  <SetupRow
+                    icon="⚙️" iconBg="#E1F5EE" iconFg="#0F6E56"
+                    label="Details"
+                    value={Object.entries(choresByFreq)
+                      .map(([f, n]) => `${n} ${f}`)
+                      .join(' · ')}
+                  />
+                )}
+                {/* Rotation */}
+                {rotationMeta && (
+                  <SetupRow
+                    icon={rotationMeta.emoji} iconBg="#FBEAF0" iconFg="#993556"
+                    label="Rotation"
+                    value={rotationMeta.label}
+                    sub={rotationMeta.desc}
+                    isLast
+                  />
+                )}
+              </div>
+
+              {/* Rotation order chips — only for Admin's Word */}
+              {previewRotationType === 'admin-approval' && previewRotationOrder.length > 0 && (
+                <div style={{ marginTop: 10, padding: '12px 14px', background: '#FFF8F5', borderRadius: 14, border: '1px solid #FFD5C2' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: '#FF6B2B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Rotation Order
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {previewRotationOrder.map((name, i) => (
+                      <span key={i} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: '#fff', border: '1.5px solid #FFD5C2',
+                        borderRadius: 99, padding: '3px 10px',
+                        fontSize: 12, fontWeight: 700, color: '#FF6B2B',
+                      }}>
+                        <span style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 800 }}>{i + 1}.</span>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* ── Members (moved above chores) ─────────────────────────────────── */}
           {(members.length > 0 || previewMembers.length > 0) && (
@@ -799,6 +905,55 @@ export default function DashboardClient({
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+// Onboarding setup summary row — iOS-style settings cell
+function SetupRow({
+  icon, iconBg, iconFg, label, value, sub, isLast,
+}: {
+  icon:    string
+  iconBg:  string
+  iconFg:  string
+  label:   string
+  value:   string
+  sub?:    string
+  isLast?: boolean
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px',
+      borderBottom: isLast ? 'none' : '0.5px solid #F0F0F0',
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
+        background: iconBg, color: iconFg,
+      }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          margin: 0, fontSize: 11, fontWeight: 700,
+          color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em',
+        }}>
+          {label}
+        </p>
+        <p style={{
+          margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: '#111827',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {value}
+        </p>
+        {sub && (
+          <p style={{
+            margin: '2px 0 0', fontSize: 11, color: '#9CA3AF',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {sub}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function SectionTitle({ icon, label, count, color }: {
   icon:   string

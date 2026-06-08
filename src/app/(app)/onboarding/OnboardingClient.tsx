@@ -286,14 +286,23 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
           return { name: c.name, emoji: c.emoji, points: c.points, freq: c.freq, displayAssignTo }
         })
 
+      // Resolve the rotation order. If admin didn't customise, default to
+      // the natural member order (admin → roommates in add-order).
+      const finalRotationOrder = rotationOrder.length > 0
+        ? rotationOrder
+        : allNames
+
       try {
         sessionStorage.setItem('cs_preview_onboarding', JSON.stringify({
           name: household.name,
+          adminName: adminDisplayName,
           members: [
             { name: adminDisplayName, color: '#FF6B2B', avatarUrl: null, isMe: true },
             ...members.map(m => ({ name: m.name, color: m.color, avatarUrl: null, isMe: false })),
           ],
           chores: resolvedChores,
+          rotationType,
+          rotationOrder: finalRotationOrder,
         }))
       } catch { /* ignore */ }
       router.push('/dashboard')
