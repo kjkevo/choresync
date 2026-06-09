@@ -460,6 +460,8 @@ export default function ProfileClient({
       await updateProfile(pfd)
       setSuccessMsg('Photo updated!')
       setEditModal(null)
+      // Refresh page data to show updated avatar
+      router.refresh()
     }
   }
 
