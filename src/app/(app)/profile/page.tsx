@@ -16,36 +16,8 @@ export default async function ProfilePage({
   const { data: { user } } = await supabase.auth.getUser()
   const { gcal } = await searchParams
 
-  // if (!user) redirect('/login') // TODO: re-enable
-  if (!user) {
-    const guestUser = {
-      id: '', email: '', user_metadata: {}, app_metadata: {},
-      aud: 'authenticated', created_at: '',
-    } as unknown as Parameters<typeof ProfileClient>[0]['user']
-    const guestProfile: UserRow = {
-      id: '', email: '', full_name: null, avatar_url: null,
-      username: null, tagline: null,
-      google_calendar_refresh_token: null,
-      created_at: '', updated_at: '',
-    }
-    return (
-      <ProfileClient
-        user={guestUser}
-        profile={guestProfile}
-        membership={null}
-        householdId={null}
-        members={[]}
-        streak={null}
-        stats={{ totalChores: 0, onTimeRate: null, totalPoints: 0 }}
-        isTopEarner={false}
-        initialUsername=""
-        initialTagline=""
-        googleCalendarConnected={false}
-        gcalStatus={null}
-        allHouseholds={[]}
-      />
-    )
-  }
+  // Auth gate (middleware also enforces this at the edge)
+  if (!user) redirect('/login?redirectTo=/profile')
 
   // ── 1. Profile ────────────────────────────────────────────────────────────
   const { data: profile } = await supabase
