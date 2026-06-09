@@ -117,6 +117,15 @@ interface PreviewChore {
   displayAssignTo: string   // pre-resolved name (no 'me' / 'unassigned' — always a display name)
 }
 
+interface PhotoSubmission {
+  id:          string        // unique submission ID
+  choreIdx:    number        // index in previewChores
+  submittedBy: string        // member name who submitted
+  photoDataUrl: string       // base64 data URL of photo
+  status:      'pending' | 'approved' | 'declined'
+  timestamp:   number        // ms since epoch
+}
+
 interface DashboardClientProps {
   currentUser:         UserRow
   myOverdueChores:     ChoreWithAssignee[]
@@ -179,6 +188,7 @@ export default function DashboardClient({
   const [previewChores,        setPreviewChores]        = useState<PreviewChore[]>([])
   const [previewRotationType,  setPreviewRotationType]  = useState<string>('')
   const [previewRotationOrder, setPreviewRotationOrder] = useState<string[]>([])
+  const [photoSubmissions,     setPhotoSubmissions]     = useState<PhotoSubmission[]>([])
 
   useEffect(() => {
     if (householdId) return  // real household — don't override
@@ -204,6 +214,13 @@ export default function DashboardClient({
       setPreviewChores(data.chores ?? [])
       setPreviewRotationType(data.rotationType ?? '')
       setPreviewRotationOrder(data.rotationOrder ?? [])
+      // Load photo submissions for admin-approval mode
+      const submissionsRaw = sessionStorage.getItem('cs_preview_submissions')
+      if (submissionsRaw) {
+        try {
+          setPhotoSubmissions(JSON.parse(submissionsRaw))
+        } catch { /* ignore */ }
+      }
     } catch { /* ignore */ }
   }, [householdId])
 
@@ -265,6 +282,88 @@ export default function DashboardClient({
       return updatedChores
     })
   }, [previewMembers])
+
+  // Admin approval mode: member submits a photo for a chore
+  const submitPhotoForChore = useCallback((choreIdx: number, photoDataUrl: string) => {
+    if (!photoDataUrl) return
+    const chore = previewChores[choreIdx]
+    if (!chore) return
+
+    const submission: PhotoSubmission = {
+      id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      choreIdx,
+      submittedBy: currentUser.full_name || 'Unknown',
+      photoDataUrl,
+      status: 'pending',
+      timestamp: Date.now(),
+    }
+
+    const updated = [...photoSubmissions, submission]
+    setPhotoSubmissions(updated)
+
+    // Persist to sessionStorage
+    try {
+      sessionStorage.setItem('cs_preview_submissions', JSON.stringify(updated))
+    } catch { /* ignore */ }
+  }, [previewChores, photoSubmissions, currentUser.full_name])
+
+  // Admin approves a photo submission: award points, advance chore
+  const approvePhotoSubmission = useCallback((submissionId: string) => {
+    const submission = photoSubmissions.find(s => s.id === submissionId)
+    if (!submission) return
+
+    const chore = previewChores[submission.choreIdx]
+    if (!chore) return
+
+    // Award points to the member who submitted
+    setPreviewMembers(prevMembers => {
+      const updated = prevMembers.map(m =>
+        m.name === submission.submittedBy
+          ? { ...m, points: (m.points ?? 0) + chore.points }
+          : m
+      )
+
+      // Update submission status
+      const updatedSubmissions = photoSubmissions.map(s =>
+        s.id === submissionId ? { ...s, status: 'approved' as const } : s
+      )
+      setPhotoSubmissions(updatedSubmissions)
+
+      // Rotate chore to next person
+      const order = prevMembers.map(m => m.name ?? '').filter(Boolean)
+      if (order.length > 0) {
+        const currentIdx = order.indexOf(chore.displayAssignTo)
+        const nextIdx = (currentIdx + 1) % order.length
+        setPreviewChores(prev => {
+          const updatedChores = prev.slice()
+          updatedChores[submission.choreIdx] = {
+            ...chore,
+            displayAssignTo: order[nextIdx],
+          }
+          return updatedChores
+        })
+      }
+
+      // Persist
+      try {
+        sessionStorage.setItem('cs_preview_submissions', JSON.stringify(updatedSubmissions))
+      } catch { /* ignore */ }
+
+      return updated
+    })
+  }, [photoSubmissions, previewChores, previewMembers])
+
+  // Admin declines a photo submission
+  const declinePhotoSubmission = useCallback((submissionId: string) => {
+    const updated = photoSubmissions.map(s =>
+      s.id === submissionId ? { ...s, status: 'declined' as const } : s
+    )
+    setPhotoSubmissions(updated)
+
+    try {
+      sessionStorage.setItem('cs_preview_submissions', JSON.stringify(updated))
+    } catch { /* ignore */ }
+  }, [photoSubmissions])
 
   const visiblePins  = pinnedAnnouncements.filter(a => !dismissedPins.has(a.id))
   const totalPending = overdueChores.length + todayChores.length
