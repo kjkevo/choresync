@@ -894,6 +894,108 @@ export default function ProfileClient({
 
         {/* ── Households ────────────────────────────────────────────────────── */}
         <SectionGroup title="Households">
+          {/* Prominent invite card — show when user is admin of a household */}
+          {membership?.household && membership.role === 'admin' && (
+            <div style={{
+              margin: '0 16px 14px', padding: 16, borderRadius: 12,
+              background: 'linear-gradient(135deg, #FF6B2B 0%, #FF8C47 100%)',
+              border: 'none', color: '#fff',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ fontSize: 24 }}>🔗</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                    Invite a roommate
+                  </div>
+                  <p style={{ fontSize: 12, margin: '0 0 10px', opacity: 0.95, lineHeight: 1.4 }}>
+                    Share your household code or send an invite email to get everyone on ChoreSync.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleCopyLink}
+                      style={{
+                        padding: '8px 14px', borderRadius: 8,
+                        border: 'none', background: 'rgba(255,255,255,0.2)',
+                        backdropFilter: 'blur(10px)',
+                        color: '#fff', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.3)'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.2)'
+                      }}
+                    >
+                      {linkCopied ? '✓ Link copied' : '📋 Copy link'}
+                    </button>
+                    <button
+                      onClick={() => setInviteOpen(o => !o)}
+                      style={{
+                        padding: '8px 14px', borderRadius: 8,
+                        border: 'none', background: '#fff',
+                        color: '#FF6B2B', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.opacity = '0.9'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.opacity = '1'
+                      }}
+                    >
+                      ✉️ Send email
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Collapsible email form for new prominent card */}
+          {inviteOpen && membership?.household && membership.role === 'admin' && (
+            <div style={{ margin: '0 16px 14px', padding: 14, background: '#FFF3EE', borderRadius: 10, border: '1.5px solid #FCDDD7' }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSendInvite()}
+                  placeholder="friend@example.com"
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 8,
+                    border: '1px solid #E5E7EB', background: '#fff',
+                    fontSize: 13, color: '#111827', fontFamily: '"Nunito", sans-serif',
+                  }}
+                />
+                <button
+                  onClick={handleSendInvite}
+                  disabled={!inviteEmail.trim() || inviteSending}
+                  style={{
+                    padding: '10px 16px', borderRadius: 8, border: 'none',
+                    background: '#FF6B2B', color: '#fff', fontSize: 13, fontWeight: 700,
+                    cursor: inviteEmail.trim() && !inviteSending ? 'pointer' : 'not-allowed',
+                    opacity: inviteEmail.trim() && !inviteSending ? 1 : 0.5,
+                    fontFamily: '"Nunito", sans-serif',
+                  }}
+                >
+                  {inviteSending ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+              {inviteMsg && (
+                <p style={{
+                  fontSize: 12, margin: 0,
+                  color: inviteMsg.ok ? '#10B981' : '#EF4444',
+                  fontWeight: 600,
+                }}>
+                  {inviteMsg.ok ? '✓' : '✗'} {inviteMsg.text}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* List every household the user belongs to */}
           {households.map((h) => (
             <a
@@ -970,100 +1072,6 @@ export default function ProfileClient({
               sub={`${preview.memberCount} member${preview.memberCount !== 1 ? 's' : ''} · you're admin`}
               onClick={() => {}} />
           ) : null}
-          {/* ── Invite row — only shown when a household exists ── */}
-          {membership?.household && (
-            <div style={{ borderBottom: 'none' }}>
-              {/* Header row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px' }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                  background: ICON_BG.blue.bg, color: ICON_BG.blue.fg,
-                }}>🔗</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400 }}>
-                    Invite someone
-                  </span>
-                  <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginTop: 1 }}>
-                    Share a link or send an email
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    style={{
-                      padding: '5px 10px', borderRadius: 8,
-                      border: '1.5px solid #E5E7EB', background: '#fff',
-                      fontSize: 11, fontWeight: 700, color: '#6B7280',
-                      cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
-                    }}
-                  >
-                    {linkCopied ? '✓ Link' : '🔗 Link'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setInviteOpen(o => !o); setInviteMsg(null) }}
-                    style={{
-                      padding: '5px 10px', borderRadius: 8,
-                      border: 'none', background: '#FF6B2B', color: '#fff',
-                      fontSize: 11, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: '"Nunito", sans-serif',
-                    }}
-                  >
-                    ✉️ Email
-                  </button>
-                </div>
-              </div>
-
-              {/* Collapsible email form */}
-              {inviteOpen && (
-                <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={e => setInviteEmail(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleSendInvite()}
-                      placeholder="friend@email.com"
-                      style={{
-                        flex: 1, padding: '9px 13px', borderRadius: 10,
-                        border: '1.5px solid #E5E7EB', background: '#F7F8FA',
-                        fontSize: 13, color: '#111827',
-                        fontFamily: '"Nunito", sans-serif', outline: 'none',
-                      }}
-                      onFocus={e => { e.currentTarget.style.borderColor = '#FF6B2B' }}
-                      onBlur={e =>  { e.currentTarget.style.borderColor = '#E5E7EB' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSendInvite}
-                      disabled={!inviteEmail.trim() || inviteSending}
-                      style={{
-                        padding: '9px 16px', borderRadius: 10, border: 'none',
-                        background: inviteEmail.trim() && !inviteSending ? '#FF6B2B' : '#E5E7EB',
-                        color: inviteEmail.trim() && !inviteSending ? '#fff' : '#9CA3AF',
-                        fontSize: 13, fontWeight: 700,
-                        cursor: inviteEmail.trim() && !inviteSending ? 'pointer' : 'default',
-                        fontFamily: '"Nunito", sans-serif', flexShrink: 0,
-                      }}
-                    >
-                      {inviteSending ? 'Sending…' : 'Send'}
-                    </button>
-                  </div>
-                  {inviteMsg && (
-                    <p style={{
-                      margin: 0, fontSize: 12, fontWeight: 700,
-                      color: inviteMsg.ok ? '#10B981' : '#EF4444',
-                    }}>
-                      {inviteMsg.ok ? '✓ ' : '✕ '}{inviteMsg.text}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* ── Create / Join buttons ─────────────────────────────────────── */}
           <div style={{ display: 'flex', gap: 8, padding: '12px 16px 14px' }}>
             <button
