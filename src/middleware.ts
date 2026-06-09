@@ -5,6 +5,7 @@ import { createMiddlewareClient } from '@/lib/supabase/middleware'
  * Protected app routes — redirect to /onboarding when no valid session.
  * Public routes (login, signup, onboarding, join, privacy, terms) are
  * always accessible without a session.
+ * Settings routes also allowed (e.g. /settings/change-password)
  */
 const PUBLIC_PREFIXES = [
   '/onboarding',
@@ -15,6 +16,7 @@ const PUBLIC_PREFIXES = [
   '/join/',
   '/privacy',
   '/terms',
+  '/settings/change-password',
 ]
 
 export async function middleware(request: NextRequest) {
@@ -36,6 +38,25 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/login'
     url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // Authenticated users without a household → onboarding to create/join one
+  // Exception: allow settings routes (e.g., change password) even without household
+  if (pathname.startsWith('/settings')) return response
+  if (pathname.startsWith('/profile') || pathname === '/dashboard' || pathname === '/' || pathname.startsWith('/calendar') || pathname.startsWith('/social') || pathname.startsWith('/history')) {
+    // Check if user has a household membership
+    const { data: membership } = await supabase
+      .from('household_members')
+      .select('household_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    // No household → redirect to onboarding
+    if (!membership?.household_id) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   return response
