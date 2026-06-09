@@ -127,6 +127,9 @@ export default function ProfileClient({
   // Appearance is a local-only display preference (no DB column needed)
   const [appearance, setAppearance] = useState<'light' | 'dark' | 'system'>('system')
 
+  // Sign out confirmation
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+
   // Guest-mode avatar — when no real session, stored as data URL in localStorage
   // so the user can pick a photo immediately without signing up
   const [guestAvatarUrl, setGuestAvatarUrl] = useState<string | null>(null)
@@ -472,7 +475,14 @@ export default function ProfileClient({
     setSuccessMsg('Color updated!')
   }
 
-  function handleSignOut() { startSignOut(() => signOut()) }
+  function handleSignOut() {
+    setShowSignOutConfirm(true)
+  }
+
+  function confirmSignOut() {
+    setShowSignOutConfirm(false)
+    startSignOut(() => signOut())
+  }
 
   function openEdit(modal: typeof editModal) {
     setSuccessMsg(null); setErrorMsg(null)
@@ -1289,6 +1299,39 @@ export default function ProfileClient({
             disabled={joinCode.trim().length !== 6 || householdPending}
             onClick={handleJoinHousehold}
           />
+        </Modal>
+      )}
+
+      {/* ── Sign out confirmation modal ──────────────────────────────────── */}
+      {showSignOutConfirm && (
+        <Modal title="Sign out?" onClose={() => setShowSignOutConfirm(false)}>
+          <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 16px', lineHeight: 1.5 }}>
+            Sign out of ChoreSync? You'll need to log back in.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setShowSignOutConfirm(false)}
+              style={{
+                flex: 1, padding: '12px 16px', borderRadius: 10, border: 'none',
+                background: '#F3F4F6', color: '#111827', fontWeight: 700, fontSize: 14,
+                fontFamily: '"Nunito", sans-serif', cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmSignOut}
+              disabled={isSigningOut}
+              style={{
+                flex: 1, padding: '12px 16px', borderRadius: 10, border: 'none',
+                background: '#EF4444', color: '#fff', fontWeight: 700, fontSize: 14,
+                fontFamily: '"Nunito", sans-serif', cursor: isSigningOut ? 'not-allowed' : 'pointer',
+                opacity: isSigningOut ? 0.7 : 1,
+              }}
+            >
+              {isSigningOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </Modal>
       )}
 
