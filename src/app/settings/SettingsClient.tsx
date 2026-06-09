@@ -29,8 +29,7 @@ export default function SettingsClient({ user }: SettingsClientProps) {
       title: 'Notifications',
       description: 'Manage alerts and notification preferences',
       action: () => {
-        // Future: navigate to notifications settings
-        alert('Notifications settings coming soon!')
+        router.push('/settings/notifications')
       },
     },
     {
