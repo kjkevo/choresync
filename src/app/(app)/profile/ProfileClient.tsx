@@ -4,7 +4,7 @@ import React, { useRef, useState, useTransition, useEffect, useCallback } from '
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { signOut, updateProfile, uploadAvatar } from '@/lib/actions/auth'
+import { signOut, updateProfile, uploadAvatar, updateEmail } from '@/lib/actions/auth'
 import { disconnectGoogleCalendar } from '@/lib/actions/google-calendar'
 import { sendInviteEmail, createHousehold, joinHousehold } from '@/lib/actions/household'
 import BottomNav from '@/components/ui/BottomNav'
@@ -101,7 +101,7 @@ export default function ProfileClient({
 }: ProfileClientProps) {
   const router = useRouter()
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
-  const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance'>(null)
+  const [editModal,       setEditModal]      = useState<null | 'name' | 'tagline' | 'username' | 'avatar' | 'appearance' | 'email'>(null)
   const [successMsg,      setSuccessMsg]     = useState<string | null>(null)
   const [errorMsg,        setErrorMsg]       = useState<string | null>(null)
   const [isPending,       startTransition]   = useTransition()
@@ -283,6 +283,7 @@ export default function ProfileClient({
   const [draftName,     setDraftName]     = useState('')
   const [draftTagline,  setDraftTagline]  = useState('')
   const [draftUsername, setDraftUsername] = useState('')
+  const [draftEmail,    setDraftEmail]    = useState('')
 
   useEffect(() => {
     // Appearance is stored locally (cosmetic only — no server round-trip needed)
@@ -349,6 +350,22 @@ export default function ProfileClient({
       const r = await updateProfile(fd)
       if (r?.error) { setErrorMsg(r.error); setUsername(initialUsername) }
       else setSuccessMsg('Username saved!')
+    })
+  }
+
+  async function handleSaveEmail() {
+    const newEmail = draftEmail.trim()
+    if (!newEmail) return
+    const fd = new FormData()
+    fd.append('newEmail', newEmail)
+    startTransition(async () => {
+      const r = await updateEmail(fd)
+      if (r?.error) {
+        setErrorMsg(r.error)
+      } else {
+        setSuccessMsg(r.message || 'Verification link sent! Check your email.')
+        setEditModal(null)
+      }
     })
   }
 
@@ -436,6 +453,7 @@ export default function ProfileClient({
     if (modal === 'name')     setDraftName(displayName)
     if (modal === 'tagline')  setDraftTagline(tagline)
     if (modal === 'username') setDraftUsername(username ? `@${username}` : '')
+    if (modal === 'email')    setDraftEmail(user.email ?? '')
     setEditModal(modal)
   }
 
@@ -886,7 +904,7 @@ export default function ProfileClient({
         {/* ── Account & privacy ─────────────────────────────────────────────── */}
         <SectionGroup title="Account & privacy">
           <ListRow icon="🔒" color="coral" label="Change password" sub="Update your login credentials" href="/forgot-password" />
-          <ListRow icon="✉️" color="coral" label="Email address" sub={user.email ?? '—'} onClick={() => {}} noChevron />
+          <ListRow icon="✉️" color="coral" label="Email address" sub={user.email ?? '—'} onClick={() => openEdit('email')} />
           <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Export or delete your data" href="/privacy" />
           <ListRow icon="🚪" color="pink" label="Sign out" labelColor="#993556"
             onClick={handleSignOut}
@@ -921,6 +939,28 @@ export default function ProfileClient({
           <input autoFocus value={draftUsername} onChange={e => setDraftUsername(e.target.value)}
             placeholder="@yourname" maxLength={30} style={INPUT_STYLE} />
           <ModalBtn label="Save username" onClick={handleSaveUsername} />
+        </Modal>
+      )}
+
+      {editModal === 'email' && (
+        <Modal title="Email address" onClose={() => setEditModal(null)}>
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: '#6B7280', margin: '0 0 8px' }}>Current email</p>
+            <p style={{ fontSize: 14, color: '#111827', fontWeight: 500, margin: 0, padding: '10px 12px', background: '#F9FAFB', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+              {user.email}
+            </p>
+          </div>
+          <p style={{ fontSize: 12, color: '#6B7280', margin: '0 0 8px' }}>New email address</p>
+          <input autoFocus value={draftEmail} onChange={e => setDraftEmail(e.target.value)}
+            placeholder="newemail@example.com" type="email" style={INPUT_STYLE} />
+          <p style={{ fontSize: 11, color: '#9CA3AF', margin: '8px 0 0' }}>
+            We'll send a confirmation link to verify your new email.
+          </p>
+          <ModalBtn
+            label={isPending ? 'Sending verification…' : 'Change email'}
+            disabled={!draftEmail.trim() || draftEmail === user.email || isPending}
+            onClick={handleSaveEmail}
+          />
         </Modal>
       )}
 

@@ -147,6 +147,45 @@ export async function updateProfile(formData: FormData) {
   return { success: true }
 }
 
+// ── Update Email (requires re-auth confirmation) ──────────────────────────────
+
+export async function updateEmail(formData: FormData) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) return { error: 'Not authenticated' }
+
+  const newEmail = (formData.get('newEmail') as string | null)?.trim()
+  if (!newEmail) return { error: 'Email is required' }
+
+  if (newEmail === user.email) return { error: 'New email is the same as current email' }
+
+  // Email regex validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(newEmail)) return { error: 'Invalid email format' }
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ??
+    'https://choresync-theta.vercel.app'
+
+  // Update auth email — sends verification to new email address
+  const { error } = await supabase.auth.updateUser(
+    { email: newEmail },
+    {
+      emailRedirectTo: `${siteUrl}/auth/callback?type=email_change`,
+    }
+  )
+
+  if (error) return { error: error.message }
+
+  // Return success but note that user must verify the new email
+  return { success: true, message: `Verification link sent to ${newEmail}. Please check your email to confirm the change.` }
+}
+
 // ── Upload Avatar ─────────────────────────────────────────────────────────────
 
 export async function uploadAvatar(formData: FormData) {
