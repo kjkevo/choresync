@@ -79,6 +79,48 @@ export async function sendPasswordReset(formData: FormData) {
   return { success: true }
 }
 
+// ── Change Password (logged-in user with current password) ─────────────────────
+
+export async function changePassword(formData: FormData) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) return { error: 'Not authenticated' }
+  if (!user.email) return { error: 'User email not found' }
+
+  const currentPassword = (formData.get('currentPassword') as string | null)?.trim()
+  const newPassword     = (formData.get('newPassword')     as string | null)?.trim()
+  const confirmPassword = (formData.get('confirmPassword') as string | null)?.trim()
+
+  // Validation
+  if (!currentPassword) return { error: 'Current password is required' }
+  if (!newPassword)     return { error: 'New password is required' }
+  if (!confirmPassword) return { error: 'Password confirmation is required' }
+  if (newPassword.length < 6) return { error: 'New password must be at least 6 characters' }
+  if (newPassword !== confirmPassword) return { error: 'Passwords do not match' }
+  if (currentPassword === newPassword) return { error: 'New password must be different from current password' }
+
+  // Verify current password by attempting re-authentication
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  })
+
+  if (signInError) return { error: 'Current password is incorrect' }
+
+  // Current password verified — now update to new password
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath('/profile')
+  return { success: true, message: 'Password changed successfully' }
+}
+
 // ── Update Password (after reset link) ───────────────────────────────────────
 
 export async function updatePassword(formData: FormData) {

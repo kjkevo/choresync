@@ -903,7 +903,7 @@ export default function ProfileClient({
 
         {/* ── Account & privacy ─────────────────────────────────────────────── */}
         <SectionGroup title="Account & privacy">
-          <ListRow icon="🔒" color="coral" label="Change password" sub="Update your login credentials" href="/forgot-password" />
+          <ListRow icon="🔒" color="coral" label="Change password" sub="Update your login credentials" href="/settings/change-password" />
           <ListRow icon="✉️" color="coral" label="Email address" sub={user.email ?? '—'} onClick={() => openEdit('email')} />
           <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Export or delete your data" href="/privacy" />
           <ListRow icon="🚪" color="pink" label="Sign out" labelColor="#993556"
