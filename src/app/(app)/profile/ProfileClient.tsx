@@ -595,6 +595,27 @@ export default function ProfileClient({
             {profile?.full_name ? displayName : 'Set your name →'}
           </button>
 
+          {/* Role badge — show admin/member status */}
+          {membership?.household && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 12,
+              background: membership.role === 'admin' ? '#FEF3C7' : '#E0E7FF',
+              color: membership.role === 'admin' ? '#92400E' : '#312E81',
+              marginTop: 6, display: 'inline-block',
+            }}>
+              {membership.role === 'admin' ? '👑 Admin' : '👤 Member'}
+            </span>
+          )}
+          {preview && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 12,
+              background: '#FEF3C7', color: '#92400E',
+              marginTop: 6, display: 'inline-block',
+            }}>
+              👑 Admin
+            </span>
+          )}
+
           {membership?.household ? (
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
               {membership.household.name} · {membership.role === 'admin' ? 'Admin' : 'Member'}
