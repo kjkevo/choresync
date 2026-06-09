@@ -37,10 +37,7 @@ export default function SettingsClient({ user }: SettingsClientProps) {
       title: 'Appearance',
       description: `Current: ${appearance === 'system' ? 'System default' : appearance === 'dark' ? 'Dark mode' : 'Light mode'}`,
       action: () => {
-        // Toggle appearance setting
-        const next = appearance === 'light' ? 'dark' : appearance === 'dark' ? 'system' : 'light'
-        setAppearance(next)
-        localStorage.setItem('cs_appearance', next)
+        router.push('/settings/appearance')
       },
     },
     {
