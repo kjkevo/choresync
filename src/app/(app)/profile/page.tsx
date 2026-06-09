@@ -130,6 +130,34 @@ export default async function ProfilePage({
     : null   // null = no dated chores yet → show "—" in UI
   const totalPoints = ((pointEventsRaw ?? []) as { points: number }[]).reduce((s, r) => s + r.points, 0)
 
+  // ── 5. Recent activity (last 5 completions) ────────────────────────────────
+  let recentActivity: Array<{
+    choreId: string
+    choreName: string
+    choreEmoji: string
+    completedAt: string
+    points: number
+  }> = []
+
+  if (householdId) {
+    const { data: recentCompletionsRaw } = await supabase
+      .from('chore_completions')
+      .select('id, chore_id, chore_name, points, completed_at, chores(emoji)')
+      .eq('completed_by', user.id)
+      .eq('household_id', householdId)
+      .order('completed_at', { ascending: false })
+      .limit(5)
+
+    recentActivity = ((recentCompletionsRaw ?? []) as any[])
+      .map(rc => ({
+        choreId: rc.chore_id || '',
+        choreName: rc.chore_name || 'Unknown chore',
+        choreEmoji: rc.chores?.emoji || '✓',
+        completedAt: rc.completed_at,
+        points: rc.points ?? 0,
+      }))
+  }
+
   // ── 5. Household rank (by total completions) ──────────────────────────────
   let householdRank: number | null = null
   let householdSize: number = 0
@@ -239,6 +267,7 @@ export default async function ProfilePage({
       googleCalendarConnected={googleCalendarConnected}
       gcalStatus={gcalStatus}
       allHouseholds={allHouseholds}
+      recentActivity={recentActivity}
     />
   )
 }

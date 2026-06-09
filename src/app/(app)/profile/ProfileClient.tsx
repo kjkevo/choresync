@@ -79,6 +79,13 @@ interface ProfileClientProps {
   googleCalendarConnected: boolean
   gcalStatus:              GcalStatus
   allHouseholds:           HouseholdSummary[]
+  recentActivity:          Array<{
+    choreId: string
+    choreName: string
+    choreEmoji: string
+    completedAt: string
+    points: number
+  }>
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -102,6 +109,7 @@ export default function ProfileClient({
   initialUsername, initialTagline,
   googleCalendarConnected, gcalStatus,
   allHouseholds: initialHouseholds,
+  recentActivity,
 }: ProfileClientProps) {
   const router = useRouter()
   const [activeTab,       setActiveTab]      = useState<'profile' | 'chores'>('profile')
@@ -721,6 +729,64 @@ export default function ProfileClient({
                       {memberPoints} pts
                     </span>
                   </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Recent Activity ───────────────────────────────────────────────── */}
+        {recentActivity.length > 0 && (
+          <div style={{ margin: '16px', padding: 16, background: '#fff', borderRadius: 12, border: '0.5px solid #E5E7EB' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 12px', fontFamily: '"Poppins", sans-serif' }}>
+              📋 Recent Activity
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {recentActivity.map((activity, idx) => {
+                const completedDate = new Date(activity.completedAt)
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const yesterday = new Date(today)
+                yesterday.setDate(yesterday.getDate() - 1)
+
+                let dateLabel: string
+                if (completedDate.toDateString() === today.toDateString()) {
+                  dateLabel = 'Today'
+                } else if (completedDate.toDateString() === yesterday.toDateString()) {
+                  dateLabel = 'Yesterday'
+                } else {
+                  dateLabel = completedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                }
+
+                const timeLabel = completedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: 10, borderRadius: 8, background: '#F9FAFB',
+                      borderLeft: '3px solid #FF6B2B',
+                    }}
+                  >
+                    {/* Emoji */}
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>
+                      {activity.choreEmoji}
+                    </span>
+                    {/* Chore name + date */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                        {activity.choreName}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                        {dateLabel} · {timeLabel}
+                      </div>
+                    </div>
+                    {/* Points */}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#FF6B2B', whiteSpace: 'nowrap' }}>
+                      +{activity.points} pts
+                    </span>
+                  </div>
                 )
               })}
             </div>
