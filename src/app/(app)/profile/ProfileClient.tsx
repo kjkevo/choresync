@@ -79,9 +79,15 @@ interface ProfileClientProps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function initials(name: string | null) {
-  if (!name) return '?'
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+function initials(name: string | null, email: string = '') {
+  // Use name if available; fall back to email initial; finally '?'
+  if (name && name.trim()) {
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  }
+  if (email && email.trim()) {
+    return email[0].toUpperCase()
+  }
+  return '?'
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -510,7 +516,7 @@ export default function ProfileClient({
               {currentEmoji ? currentEmoji
                 : photoUrl
                   ? <Image src={photoUrl} alt={displayName} width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
-                  : initials(displayName)
+                  : initials(displayName, user.email ?? '')
               }
             </div>
             <div style={{
