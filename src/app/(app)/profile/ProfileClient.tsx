@@ -41,9 +41,13 @@ const ICON_BG: Record<string, { bg: string; fg: string }> = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ProfileStats {
-  totalChores: number
-  onTimeRate:  number | null   // null when no chores have a due date
-  totalPoints: number
+  totalChores:    number
+  onTimeRate:     number | null   // null when no chores have a due date
+  totalPoints:    number
+  householdRank:  number | null   // user's rank in household by completions
+  householdSize:  number
+  fairnessPercent: number | null  // user's chores / household total * 100
+  badgesEarned:   number          // count of user's earned badges
 }
 
 interface Membership {
@@ -613,7 +617,7 @@ export default function ProfileClient({
           )}
         </div>
 
-        {/* ── Stats bar ───────────────────────────────────────────────────────── */}
+        {/* ── Stats bar (row 1) ─────────────────────────────────────────────── */}
         <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
           {([
             { num: effectiveStats.totalChores, label: 'Chores done', dim: false },
@@ -621,6 +625,23 @@ export default function ProfileClient({
             { num: effectiveStats.totalPoints, label: 'Points', dim: false },
           ] as const).map((s, i) => (
             <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 2 ? '0.5px solid #E5E7EB' : 'none' }}>
+              <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
+                {s.num}
+              </span>
+              <span style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginTop: 2 }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Stats bar (row 2) ─────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
+          {([
+            { num: currentStreak, label: 'Current streak', dim: currentStreak === 0 },
+            { num: stats.householdRank ? `#${stats.householdRank}/${stats.householdSize}` : '—', label: 'Household rank', dim: !stats.householdRank },
+            { num: stats.fairnessPercent !== null ? `${stats.fairnessPercent}%` : '—', label: 'Load %', dim: stats.fairnessPercent === null },
+            { num: stats.badgesEarned, label: 'Badges earned', dim: stats.badgesEarned === 0 },
+          ] as const).map((s, i) => (
+            <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 3 ? '0.5px solid #E5E7EB' : 'none' }}>
               <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
                 {s.num}
               </span>

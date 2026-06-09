@@ -112,7 +112,48 @@ export default async function ProfilePage({
     : null   // null = no dated chores yet → show "—" in UI
   const totalPoints = ((pointEventsRaw ?? []) as { points: number }[]).reduce((s, r) => s + r.points, 0)
 
-  // ── 5. Top earner? ────────────────────────────────────────────────────────
+  // ── 5. Household rank (by total completions) ──────────────────────────────
+  let householdRank: number | null = null
+  let householdSize: number = 0
+  if (householdId) {
+    const { data: rankData } = await supabase
+      .from('user_streaks')
+      .select('user_id, total_completions')
+      .eq('household_id', householdId)
+      .order('total_completions', { ascending: false })
+
+    householdSize = (rankData ?? []).length
+    const userRank = (rankData ?? []).findIndex(r => r.user_id === user.id) + 1
+    householdRank = userRank > 0 ? userRank : null
+  }
+
+  // ── 6. Fairness % (load distribution) ─────────────────────────────────────
+  let fairnessPercent: number | null = null
+  if (householdId && householdSize > 0) {
+    const { data: allCompletionsData } = await supabase
+      .from('chore_completions')
+      .select('completed_by')
+      .eq('household_id', householdId)
+
+    const totalHouseholdChores = (allCompletionsData ?? []).length
+    if (totalHouseholdChores > 0) {
+      fairnessPercent = Math.round((totalChores / totalHouseholdChores) * 100)
+    }
+  }
+
+  // ── 7. Badges earned ─────────────────────────────────────────────────────
+  let badgesEarned: number = 0
+  if (householdId) {
+    const { data: badgeData } = await supabase
+      .from('user_badges')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('household_id', householdId)
+
+    badgesEarned = (badgeData ?? []).length
+  }
+
+  // ── 8. Top earner? ────────────────────────────────────────────────────────
   const { data: topStreak } = householdId
     ? await supabase
         .from('user_streaks')
@@ -173,7 +214,7 @@ export default async function ProfilePage({
       householdId={householdId}
       members={members}
       streak={streakRow ?? null}
-      stats={{ totalChores, onTimeRate, totalPoints }}
+      stats={{ totalChores, onTimeRate, totalPoints, householdRank, householdSize, fairnessPercent, badgesEarned }}
       isTopEarner={isTopEarner}
       initialUsername={profileRow?.username ?? ''}
       initialTagline={profileRow?.tagline  ?? ''}
