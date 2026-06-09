@@ -297,8 +297,8 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
           name: household.name,
           adminName: adminDisplayName,
           members: [
-            { name: adminDisplayName, color: '#FF6B2B', avatarUrl: null, isMe: true },
-            ...members.map(m => ({ name: m.name, color: m.color, avatarUrl: null, isMe: false })),
+            { name: adminDisplayName, color: '#FF6B2B', avatarUrl: null, isMe: true, points: 0 },
+            ...members.map(m => ({ name: m.name, color: m.color, avatarUrl: null, isMe: false, points: 0 })),
           ],
           chores: resolvedChores,
           rotationType,

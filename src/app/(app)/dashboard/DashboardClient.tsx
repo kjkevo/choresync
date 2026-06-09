@@ -107,6 +107,7 @@ interface PreviewMember {
   avatarUrl: string | null
   color:     string
   isMe?:     boolean
+  points:    number   // accumulated points from completed chores
 }
 interface PreviewChore {
   name:            string
@@ -194,7 +195,12 @@ export default function DashboardClient({
       }
       setPreviewHouseholdName(data.name ?? '')
       setPreviewAdminName(data.adminName ?? '')
-      setPreviewMembers(data.members ?? [])
+      // Ensure all members have points field (0 if not yet tracked)
+      const membersWithPoints = (data.members ?? []).map(m => ({
+        ...m,
+        points: m.points ?? 0,
+      }))
+      setPreviewMembers(membersWithPoints)
       setPreviewChores(data.chores ?? [])
       setPreviewRotationType(data.rotationType ?? '')
       setPreviewRotationOrder(data.rotationOrder ?? [])
@@ -217,34 +223,46 @@ export default function DashboardClient({
   }, {})
   const totalPoints = previewChores.reduce((s, c) => s + c.points, 0)
 
-  // Manual-Completion handler — advance the chore to the next person in
-  // the rotation, then persist to sessionStorage so the change survives
-  // page reloads and other tabs (chat, profile) see the same state.
+  // Manual-Completion handler — add points to the current assignee,
+  // advance the chore to the next person, and persist to sessionStorage.
   const completePreviewChore = useCallback((choreIdx: number) => {
+    // Update both chores AND members
     setPreviewChores(prev => {
-      const updated = prev.slice()
-      const chore   = updated[choreIdx]
+      const updatedChores = prev.slice()
+      const chore = updatedChores[choreIdx]
       if (!chore) return prev
 
-      // Resolve the rotation order (admin first then roommates, in member order)
       const order = previewMembers.map(m => m.name ?? '').filter(Boolean)
       if (order.length === 0) return prev
 
-      const currentIdx = order.indexOf(chore.displayAssignTo)
-      const nextIdx    = currentIdx === -1 ? 0 : (currentIdx + 1) % order.length
-      updated[choreIdx] = { ...chore, displayAssignTo: order[nextIdx] }
+      // Award points to the current assignee BEFORE rotating
+      setPreviewMembers(prevMembers => {
+        const updatedMembers = prevMembers.map(m =>
+          m.name === chore.displayAssignTo
+            ? { ...m, points: (m.points ?? 0) + chore.points }
+            : m
+        )
 
-      // Persist
-      try {
-        const raw = sessionStorage.getItem('cs_preview_onboarding')
-        if (raw) {
-          const data = JSON.parse(raw) as { chores?: PreviewChore[] }
-          data.chores = updated
-          sessionStorage.setItem('cs_preview_onboarding', JSON.stringify(data))
-        }
-      } catch { /* ignore */ }
+        // Rotate the chore to the next person
+        const currentIdx = order.indexOf(chore.displayAssignTo)
+        const nextIdx    = currentIdx === -1 ? 0 : (currentIdx + 1) % order.length
+        updatedChores[choreIdx] = { ...chore, displayAssignTo: order[nextIdx] }
 
-      return updated
+        // Persist both chores and members
+        try {
+          const raw = sessionStorage.getItem('cs_preview_onboarding')
+          if (raw) {
+            const data = JSON.parse(raw) as any
+            data.chores = updatedChores
+            data.members = updatedMembers
+            sessionStorage.setItem('cs_preview_onboarding', JSON.stringify(data))
+          }
+        } catch { /* ignore */ }
+
+        return updatedMembers
+      })
+
+      return updatedChores
     })
   }, [previewMembers])
 
@@ -839,8 +857,8 @@ export default function DashboardClient({
                     </p>
                     <p style={{ margin: 0, fontSize: 11, color: '#9CA3AF' }}>Complete chores to earn points</p>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
-                    0 pts
+                  <span style={{ fontSize: 13, fontWeight: 800, color: m.points > 0 ? '#FF6B2B' : '#9CA3AF', background: m.points > 0 ? '#FFF3EE' : '#F3F4F6', borderRadius: 99, padding: '3px 10px', flexShrink: 0 }}>
+                    {m.points ?? 0} pts
                   </span>
                 </div>
               )
