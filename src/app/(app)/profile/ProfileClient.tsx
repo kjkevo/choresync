@@ -530,9 +530,16 @@ export default function ProfileClient({
             </div>
           </button>
 
-          <p style={{ fontSize: 18, fontWeight: 500, color: '#111827', margin: 0, fontFamily: '"Poppins", sans-serif' }}>
-            {displayName}
-          </p>
+          <button
+            onClick={() => openEdit('name')}
+            style={{
+              fontSize: 18, fontWeight: 500, color: profile?.full_name ? '#111827' : '#9CA3AF',
+              margin: 0, fontFamily: '"Poppins", sans-serif',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            }}
+          >
+            {profile?.full_name ? displayName : 'Set your name →'}
+          </button>
 
           {membership?.household ? (
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>
