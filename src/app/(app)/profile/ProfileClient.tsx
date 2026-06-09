@@ -662,6 +662,71 @@ export default function ProfileClient({
           </div>
         )}
 
+        {/* ── My Household ──────────────────────────────────────────────────── */}
+        {members.length > 0 && (
+          <div style={{ margin: '16px', padding: 16, background: '#fff', borderRadius: 12, border: '0.5px solid #E5E7EB' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 12px', fontFamily: '"Poppins", sans-serif' }}>
+              👥 My Household ({members.length})
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              {members.map(member => {
+                const memberDisplayName = member.full_name ?? member.email?.split('@')[0] ?? 'Guest'
+                const rawAvatarUrl = member.avatar_url
+                const isEmojiAvatar = rawAvatarUrl?.startsWith('emoji:')
+                const currentEmoji = isEmojiAvatar ? rawAvatarUrl!.slice(6) : null
+                const photoUrl = !isEmojiAvatar ? rawAvatarUrl : null
+                const colors = ['#FF6B2B', '#6366F1', '#8B5CF6', '#EC4899', '#EF4444', '#F59E0B', '#10B981', '#06B6D4']
+                const colorIndex = (member.id?.charCodeAt(0) ?? 0) % colors.length
+                const selectedColor = colors[colorIndex]
+                const memberPoints = (member as any).total_points ?? 0
+
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => router.push(`/users/${member.id}`)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                      padding: 12, borderRadius: 10, border: '1px solid #E5E7EB',
+                      background: '#F9FAFB', cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      borderColor: '#F0F0F0', backgroundColor: '#FAFBFC',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = '#FF6B2B'
+                      ;(e.currentTarget as HTMLElement).style.backgroundColor = '#FFF3EE'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = '#E5E7EB'
+                      ;(e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%', background: selectedColor,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      overflow: 'hidden', fontSize: 20, fontWeight: 500, color: '#fff',
+                    }}>
+                      {currentEmoji ? currentEmoji
+                        : photoUrl
+                          ? <Image src={photoUrl} alt={memberDisplayName} width={48} height={48} style={{ width: '100%', height: '100%', objectFit: 'cover' }} unoptimized />
+                          : initials(member.full_name, member.email ?? '')
+                      }
+                    </div>
+                    {/* Name */}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', textAlign: 'center', lineHeight: 1.2 }}>
+                      {memberDisplayName}
+                    </span>
+                    {/* Points */}
+                    <span style={{ fontSize: 11, color: '#FF6B2B', fontWeight: 700 }}>
+                      {memberPoints} pts
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Identity ──────────────────────────────────────────────────────── */}
         <SectionGroup title="Identity">
           <ListRow icon="👤" color="purple" label="Display name & avatar"

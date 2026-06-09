@@ -68,7 +68,25 @@ export default async function ProfilePage({
         .from('users')
         .select('id, full_name, avatar_url, email')
         .in('id', memberIds)
-      members = (memberProfiles ?? []) as UserRow[]
+
+      // Fetch points for each member
+      const { data: memberPointsRaw } = await supabase
+        .from('point_events')
+        .select('user_id, points')
+        .eq('household_id', householdId)
+        .in('user_id', memberIds)
+
+      // Group points by user
+      const pointsByUser: Record<string, number> = {}
+      ;(memberPointsRaw ?? []).forEach(pe => {
+        pointsByUser[pe.user_id] = (pointsByUser[pe.user_id] ?? 0) + pe.points
+      })
+
+      // Add points to member profiles
+      members = ((memberProfiles ?? []) as UserRow[]).map(m => ({
+        ...m,
+        total_points: pointsByUser[m.id] ?? 0,
+      })) as (UserRow & { total_points: number })[]
     }
   }
 
