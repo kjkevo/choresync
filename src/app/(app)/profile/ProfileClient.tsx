@@ -67,7 +67,7 @@ interface ProfileClientProps {
   membership:              Membership | null
   householdId:             string | null
   members:                 UserRow[]
-  streak:                  { current_streak: number; total_completions: number } | null
+  streak:                  { current_streak: number; longest_streak: number; total_completions: number; last_active_date: string | null } | null
   stats:                   ProfileStats
   isTopEarner:             boolean
   initialUsername:         string
@@ -309,6 +309,18 @@ export default function ProfileClient({
     onTimeRate:  stats.onTimeRate,
     totalPoints: stats.totalPoints,
   }
+
+  // Streak helpers
+  const currentStreak = streak?.current_streak ?? 0
+  const longestStreak = streak?.longest_streak ?? 0
+  const lastActiveDate = streak?.last_active_date ? new Date(streak.last_active_date) : null
+
+  // Check if user completed chores today
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const completedToday = lastActiveDate && lastActiveDate.getTime() >= today.getTime()
+  const hasActivStreak = currentStreak > 0
+  const showStreakNudge = hasActivStreak && !completedToday
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -571,19 +583,34 @@ export default function ProfileClient({
             <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>No household yet</p>
           )}
 
-          {/* Streak + achievement badges */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', margin: '4px 0 16px' }}>
-            {(streak?.current_streak ?? 0) >= 2 && (
-              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: '#FAEEDA', color: '#633806' }}>
-                🔥 {streak!.current_streak}-day streak
-              </span>
-            )}
-            {isTopEarner && (
-              <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A' }}>
-                🏆 Top cleaner
-              </span>
+          {/* Streak widget */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 16px',
+            background: currentStreak > 0 ? '#FAEEDA' : '#F9FAFB',
+            padding: '8px 12px', borderRadius: 10,
+          }}>
+            <div style={{ fontSize: 24 }}>🔥</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                {currentStreak > 0 ? `${currentStreak}-day streak` : 'Start your streak'}
+              </div>
+              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>
+                {longestStreak > 0 && `Best: ${longestStreak} days`}
+              </div>
+            </div>
+            {showStreakNudge && (
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#633806', textAlign: 'right' }}>
+                Keep it going!
+              </div>
             )}
           </div>
+
+          {/* Achievement badges */}
+          {isTopEarner && (
+            <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: '#EAF3DE', color: '#27500A', display: 'inline-block' }}>
+              🏆 Top cleaner
+            </span>
+          )}
         </div>
 
         {/* ── Stats bar ───────────────────────────────────────────────────────── */}

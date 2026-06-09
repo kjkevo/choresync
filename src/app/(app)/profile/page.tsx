@@ -76,7 +76,7 @@ export default async function ProfilePage({
   const { data: streakRow } = householdId
     ? await supabase
         .from('user_streaks')
-        .select('current_streak, total_completions')
+        .select('current_streak, longest_streak, total_completions, last_active_date')
         .eq('user_id', user.id)
         .eq('household_id', householdId)
         .maybeSingle()
