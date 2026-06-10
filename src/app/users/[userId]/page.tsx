@@ -34,7 +34,7 @@ export default async function PublicProfilePage({
 
   // Fetch user's achievements/badges count
   const { data: badgesRaw } = await supabase
-    .from('user_badges')
+    .from('badges')
     .select('id')
     .eq('user_id', userId)
 
