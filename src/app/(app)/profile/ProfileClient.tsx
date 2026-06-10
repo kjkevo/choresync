@@ -38,6 +38,60 @@ const ICON_BG: Record<string, { bg: string; fg: string }> = {
   red:    { bg: '#FEE2E2', fg: '#B91C1C' },
 }
 
+// ── Badge definitions ────────────────────────────────────────────────────────
+interface BadgeDefinition {
+  id: string
+  emoji: string
+  title: string
+  description: string
+  unlockCondition: string
+}
+
+const BADGE_DEFINITIONS: Record<string, BadgeDefinition> = {
+  first_chore: {
+    id: 'first_chore',
+    emoji: '🎬',
+    title: 'Getting Started',
+    description: 'You\'ve begun your journey',
+    unlockCondition: 'Complete your first chore',
+  },
+  chores_10: {
+    id: 'chores_10',
+    emoji: '🚀',
+    title: 'Momentum',
+    description: 'You\'re building a habit',
+    unlockCondition: 'Complete 10 chores',
+  },
+  chores_100: {
+    id: 'chores_100',
+    emoji: '⭐',
+    title: 'Century Club',
+    description: 'You\'ve done the work',
+    unlockCondition: 'Complete 100 chores',
+  },
+  streak_7: {
+    id: 'streak_7',
+    emoji: '🔥',
+    title: '7-Day Streak',
+    description: 'A week of consistency',
+    unlockCondition: 'Complete chores 7 days in a row',
+  },
+  streak_30: {
+    id: 'streak_30',
+    emoji: '💪',
+    title: 'Month-Long Champion',
+    description: 'You\'re unstoppable',
+    unlockCondition: 'Complete chores 30 days in a row',
+  },
+  top_contributor: {
+    id: 'top_contributor',
+    emoji: '👑',
+    title: 'Top Contributor',
+    description: 'The household champion',
+    unlockCondition: 'Be the top contributor this month',
+  },
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ProfileStats {
@@ -47,7 +101,7 @@ interface ProfileStats {
   householdRank:  number | null   // user's rank in household by completions
   householdSize:  number
   fairnessPercent: number | null  // user's chores / household total * 100
-  badgesEarned:   number          // count of user's earned badges
+  earnedBadges:   string[]        // list of earned badge types
 }
 
 interface Membership {
@@ -323,6 +377,7 @@ export default function ProfileClient({
     totalChores: stats.totalChores > 0 ? stats.totalChores : (preview?.myChoreCount ?? 0),
     onTimeRate:  stats.onTimeRate,
     totalPoints: stats.totalPoints,
+    earnedBadges: stats.earnedBadges,
   }
 
   // Streak helpers
@@ -680,7 +735,7 @@ export default function ProfileClient({
             { num: currentStreak, label: 'Current streak', dim: currentStreak === 0, tooltip: null },
             { num: stats.householdRank ? `#${stats.householdRank}/${stats.householdSize}` : '—', label: 'Household rank', dim: !stats.householdRank, tooltip: null },
             { num: stats.fairnessPercent !== null ? `${stats.fairnessPercent}%` : '—', label: 'Load %', dim: stats.fairnessPercent === null, tooltip: 'Your % of household chores' },
-            { num: stats.badgesEarned, label: 'Badges earned', dim: stats.badgesEarned === 0, tooltip: null },
+            { num: stats.earnedBadges.length, label: 'Badges earned', dim: stats.earnedBadges.length === 0, tooltip: null },
           ] as const).map((s, i) => (
             <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 3 ? '0.5px solid #E5E7EB' : 'none', position: 'relative' }} className={s.tooltip ? 'load-percent-wrapper' : undefined}>
               <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
@@ -874,9 +929,69 @@ export default function ProfileClient({
 
         {/* ── Stats & achievements ───────────────────────────────────────────── */}
         <SectionGroup title="Stats & achievements">
-          <ListRow icon="🏅" color="amber" label="Badges & achievements"
-            sub={`${effectiveStats.totalChores} earned · complete more to unlock`}
-            onClick={() => {}} />
+          {/* Badges section */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 16px',
+            borderBottom: '0.5px solid #E5E7EB', width: '100%',
+          }}>
+            <div style={{ fontSize: 20, marginTop: 2 }}>🏅</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 12 }}>
+                Badges & Achievements
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+              }}>
+                {Object.values(BADGE_DEFINITIONS).map((badge) => {
+                  const isEarned = effectiveStats.earnedBadges.includes(badge.id)
+                  return (
+                    <div
+                      key={badge.id}
+                      title={badge.unlockCondition}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        gap: 6, padding: 12, borderRadius: 10,
+                        background: isEarned ? '#FFF8F5' : '#F9FAFB',
+                        border: `1px solid ${isEarned ? '#FFE4D6' : '#E5E7EB'}`,
+                        cursor: 'pointer', transition: 'all 0.2s',
+                        opacity: isEarned ? 1 : 0.6,
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = isEarned ? '#FFF5EE' : '#F3F4F6'
+                        ;(e.currentTarget as HTMLElement).style.borderColor = isEarned ? '#FFD4B5' : '#D1D5DB'
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = isEarned ? '#FFF8F5' : '#F9FAFB'
+                        ;(e.currentTarget as HTMLElement).style.borderColor = isEarned ? '#FFE4D6' : '#E5E7EB'
+                      }}
+                    >
+                      {/* Badge emoji (larger if earned) */}
+                      <div style={{ fontSize: isEarned ? 28 : 24 }}>
+                        {badge.emoji}
+                      </div>
+                      {/* Badge title */}
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: isEarned ? '#111827' : '#6B7280',
+                        textAlign: 'center', lineHeight: 1.3,
+                      }}>
+                        {badge.title}
+                      </div>
+                      {/* Lock icon for locked badges */}
+                      {!isEarned && (
+                        <div style={{ fontSize: 10, color: '#9CA3AF' }}>🔒</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Unlock condition tooltip info */}
+              <p style={{
+                fontSize: 11, color: '#6B7280', margin: '12px 0 0', lineHeight: 1.4,
+              }}>
+                💡 Hover over badges to see unlock conditions. You\'ve earned {effectiveStats.earnedBadges.length} badge{effectiveStats.earnedBadges.length !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          </div>
           <ListRow icon="📊" color="amber" label="My chore history"
             sub={preview && effectiveStats.totalChores === 0
               ? `${preview.choreCount} chore${preview.choreCount !== 1 ? 's' : ''} in your household`

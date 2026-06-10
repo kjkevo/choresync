@@ -188,15 +188,17 @@ export default async function ProfilePage({
   }
 
   // ── 7. Badges earned ─────────────────────────────────────────────────────
-  let badgesEarned: number = 0
+  let earnedBadges: string[] = []
   if (householdId) {
     const { data: badgeData } = await supabase
-      .from('user_badges')
-      .select('id')
+      .from('badges')
+      .select('badge_type')
       .eq('user_id', user.id)
       .eq('household_id', householdId)
 
-    badgesEarned = (badgeData ?? []).length
+    earnedBadges = ((badgeData ?? []) as { badge_type: string }[])
+      .map(b => b.badge_type)
+      .filter((b, i, arr) => arr.indexOf(b) === i) // Remove duplicates (top_contributor repeats)
   }
 
   // ── 8. Top earner? ────────────────────────────────────────────────────────
@@ -260,7 +262,7 @@ export default async function ProfilePage({
       householdId={householdId}
       members={members}
       streak={streakRow ?? null}
-      stats={{ totalChores, onTimeRate, totalPoints, householdRank, householdSize, fairnessPercent, badgesEarned }}
+      stats={{ totalChores, onTimeRate, totalPoints, householdRank, householdSize, fairnessPercent, earnedBadges }}
       isTopEarner={isTopEarner}
       initialUsername={profileRow?.username ?? ''}
       initialTagline={profileRow?.tagline  ?? ''}
