@@ -677,18 +677,51 @@ export default function ProfileClient({
         {/* ── Stats bar (row 2) ─────────────────────────────────────────────── */}
         <div style={{ display: 'flex', background: '#fff', borderBottom: '0.5px solid #E5E7EB' }}>
           {([
-            { num: currentStreak, label: 'Current streak', dim: currentStreak === 0 },
-            { num: stats.householdRank ? `#${stats.householdRank}/${stats.householdSize}` : '—', label: 'Household rank', dim: !stats.householdRank },
-            { num: stats.fairnessPercent !== null ? `${stats.fairnessPercent}%` : '—', label: 'Load %', dim: stats.fairnessPercent === null },
-            { num: stats.badgesEarned, label: 'Badges earned', dim: stats.badgesEarned === 0 },
+            { num: currentStreak, label: 'Current streak', dim: currentStreak === 0, tooltip: null },
+            { num: stats.householdRank ? `#${stats.householdRank}/${stats.householdSize}` : '—', label: 'Household rank', dim: !stats.householdRank, tooltip: null },
+            { num: stats.fairnessPercent !== null ? `${stats.fairnessPercent}%` : '—', label: 'Load %', dim: stats.fairnessPercent === null, tooltip: 'Your % of household chores' },
+            { num: stats.badgesEarned, label: 'Badges earned', dim: stats.badgesEarned === 0, tooltip: null },
           ] as const).map((s, i) => (
-            <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 3 ? '0.5px solid #E5E7EB' : 'none' }}>
+            <div key={i} style={{ flex: 1, textAlign: 'center', padding: '12px 8px', borderRight: i < 3 ? '0.5px solid #E5E7EB' : 'none', position: 'relative' }} className={s.tooltip ? 'load-percent-wrapper' : undefined}>
               <span style={{ fontSize: 18, fontWeight: 500, color: s.dim ? '#D1D5DB' : '#111827', display: 'block', fontFamily: '"Poppins", sans-serif' }}>
                 {s.num}
               </span>
-              <span style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginTop: 2 }}>{s.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 2 }}>
+                <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.label}</span>
+                {s.tooltip && (
+                  <div style={{ position: 'relative', display: 'inline-block', cursor: 'help' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    {/* Tooltip */}
+                    <div style={{
+                      position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                      marginBottom: 8, padding: '6px 10px', borderRadius: 6,
+                      background: '#111827', color: '#fff', fontSize: 10, fontWeight: 500,
+                      whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none',
+                      opacity: 0, transition: 'opacity 0.2s',
+                    }} className="load-tooltip">
+                      {s.tooltip}
+                    </div>
+                    {/* Tooltip arrow */}
+                    <div style={{
+                      position: 'absolute', bottom: '-3px', left: '50%', transform: 'translateX(-50%)',
+                      width: 0, height: 0, borderLeft: '3px solid transparent', borderRight: '3px solid transparent',
+                      borderTop: '3px solid #111827', zIndex: 50, pointerEvents: 'none',
+                      opacity: 0, transition: 'opacity 0.2s',
+                    }} className="load-tooltip-arrow" />
+                  </div>
+                )}
+              </div>
             </div>
           ))}
+          <style>{`
+            .load-percent-wrapper:hover .load-tooltip,
+            .load-percent-wrapper:hover .load-tooltip-arrow {
+              opacity: 1;
+            }
+          `}</style>
         </div>
 
         {/* Feedback toasts */}
@@ -849,11 +882,59 @@ export default function ProfileClient({
               ? `${preview.choreCount} chore${preview.choreCount !== 1 ? 's' : ''} in your household`
               : 'Full log of completed tasks'}
             href="/history" />
-          <ListRow icon="⚖️" color="amber" label="My fairness score"
-            sub={effectiveStats.totalChores > 0
-              ? `You're carrying ${effectiveStats.totalChores} of ${preview?.choreCount ?? effectiveStats.totalChores} chore${effectiveStats.totalChores !== 1 ? 's' : ''}`
-              : 'Complete chores to see your score'}
-            onClick={() => {}} isLast />
+          {/* Fairness score with tooltip */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px',
+            borderBottom: 'none', width: '100%',
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              background: ICON_BG.amber.bg, color: ICON_BG.amber.fg,
+            }}>⚖️</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 14, color: '#111827', display: 'block', fontWeight: 400 }}>
+                  My fairness score
+                </span>
+                {/* Info icon with tooltip */}
+                <div style={{ position: 'relative', display: 'inline-block', cursor: 'help' }} className="fairness-tooltip-wrapper">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2 }}>
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  {/* Tooltip */}
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                    marginBottom: 8, padding: '8px 12px', borderRadius: 8,
+                    background: '#111827', color: '#fff', fontSize: 11, fontWeight: 500,
+                    whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none',
+                    opacity: 0, transition: 'opacity 0.2s',
+                  }} className="fairness-tooltip">
+                    Your % of household chores
+                  </div>
+                  {/* Tooltip arrow */}
+                  <div style={{
+                    position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)',
+                    width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+                    borderTop: '4px solid #111827', zIndex: 50, pointerEvents: 'none',
+                    opacity: 0, transition: 'opacity 0.2s',
+                  }} className="fairness-tooltip-arrow" />
+                </div>
+              </div>
+              <span style={{ fontSize: 12, color: '#9CA3AF', display: 'block' }}>
+                {effectiveStats.totalChores > 0
+                  ? `You're carrying ${effectiveStats.totalChores} of ${preview?.choreCount ?? effectiveStats.totalChores} chore${effectiveStats.totalChores !== 1 ? 's' : ''}`
+                  : 'Complete chores to see your score'}
+              </span>
+            </div>
+          </div>
+          <style>{`
+            .fairness-tooltip-wrapper:hover .fairness-tooltip,
+            .fairness-tooltip-wrapper:hover .fairness-tooltip-arrow {
+              opacity: 1;
+            }
+          `}</style>
         </SectionGroup>
 
         {/* ── Preferences ───────────────────────────────────────────────────── */}
