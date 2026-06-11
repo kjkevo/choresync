@@ -184,10 +184,28 @@ function LogTab({
   const [search,     setSearch]     = useState('')
   const [memberFilter, setMemberFilter] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'all'>('all')
   const [page,       setPage]       = useState(0)
 
   const filtered = useMemo(() => {
     let list = entries
+    
+    // Time period filter
+    const now = new Date()
+    let since: Date | null = null
+    
+    if (timePeriod === 'week') {
+      since = new Date(now)
+      since.setDate(since.getDate() - 7)
+    } else if (timePeriod === 'month') {
+      since = new Date(now)
+      since.setMonth(since.getMonth() - 1)
+    }
+    
+    if (since) {
+      list = list.filter(e => new Date(e.completed_at) >= since!)
+    }
+    
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(e => e.chore_name.toLowerCase().includes(q))
@@ -195,19 +213,20 @@ function LogTab({
     if (memberFilter) list = list.filter(e => e.completed_by === memberFilter)
     if (categoryFilter) list = list.filter(e => e.category === categoryFilter)
     return list
-  }, [entries, search, memberFilter, categoryFilter])
+  }, [entries, search, memberFilter, categoryFilter, timePeriod])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageEntries = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   // Reset page when filters change
-  const prevFilters = useRef({ search, memberFilter, categoryFilter })
+  const prevFilters = useRef({ search, memberFilter, categoryFilter, timePeriod })
   if (
     prevFilters.current.search !== search ||
     prevFilters.current.memberFilter !== memberFilter ||
-    prevFilters.current.categoryFilter !== categoryFilter
+    prevFilters.current.categoryFilter !== categoryFilter ||
+    prevFilters.current.timePeriod !== timePeriod
   ) {
-    prevFilters.current = { search, memberFilter, categoryFilter }
+    prevFilters.current = { search, memberFilter, categoryFilter, timePeriod }
     if (page !== 0) setPage(0)
   }
 
@@ -228,6 +247,13 @@ function LogTab({
             placeholder="Search chore name…"
             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
+        </div>
+
+        {/* Time period pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <FilterPill active={timePeriod === 'all'} onClick={() => setTimePeriod('all')}>All time</FilterPill>
+          <FilterPill active={timePeriod === 'month'} onClick={() => setTimePeriod('month')}>This month</FilterPill>
+          <FilterPill active={timePeriod === 'week'} onClick={() => setTimePeriod('week')}>This week</FilterPill>
         </div>
 
         {/* Member pills */}
@@ -263,7 +289,7 @@ function LogTab({
       {/* Count */}
       <p className="text-xs font-semibold text-slate-400">
         {filtered.length} completion{filtered.length !== 1 ? 's' : ''}
-        {(memberFilter || categoryFilter || search) ? ' (filtered)' : ' in the last 90 days'}
+        {(memberFilter || categoryFilter || search || timePeriod !== 'all') ? ' (filtered)' : ' in all time'}
       </p>
 
       {/* Log list */}
