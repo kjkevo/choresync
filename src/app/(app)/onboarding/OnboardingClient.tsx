@@ -1310,13 +1310,14 @@ function SuccessScreen({
       setCountdown(c => {
         if (c <= 1) {
           clearInterval(interval)
-          router.push('/dashboard')
+          // Pass household ID so dashboard knows this is a fresh household
+          router.push(`/dashboard?h=${household.id}&fresh=1`)
         }
         return c - 1
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [router])
+  }, [router, household.id])
 
   function copyCode() {
     navigator.clipboard?.writeText(household.invite_code)
@@ -1385,7 +1386,7 @@ function SuccessScreen({
 
               <button
                 type="button"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(`/dashboard?h=${household.id}&fresh=1`)}
                 style={primaryBtn(false)}
               >
                 Go to Dashboard → {countdown > 0 && `(${countdown})`}

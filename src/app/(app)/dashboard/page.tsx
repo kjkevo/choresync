@@ -19,10 +19,11 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ h?: string }>
+  searchParams: Promise<{ h?: string; fresh?: string }>
 }) {
   const supabase = await createClient()
   const params   = await searchParams
+  const isFresh  = params.fresh === '1'  // User just created this household
 
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -67,9 +68,13 @@ export default async function DashboardPage({
   // If so, try multiple times with delays to allow database to catch up
   let allMembershipsData = allMemberships
   if (!allMemberships || allMemberships.length === 0) {
-    // Try up to 3 times with increasing delays
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, attempt * 200))
+    // If fresh household creation, try more aggressively
+    const maxAttempts = isFresh ? 8 : 3
+    const delayMultiplier = isFresh ? 300 : 200
+
+    // Try up to maxAttempts times with increasing delays
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, attempt * delayMultiplier))
       const { data: retryMemberships } = await supabase
         .from('household_members')
         .select('household_id, role, color_theme')
@@ -81,7 +86,7 @@ export default async function DashboardPage({
       }
     }
 
-    // Still nothing after 3 retries — redirect to onboarding
+    // Still nothing after retries — redirect to onboarding
     if (!allMembershipsData || allMembershipsData.length === 0) {
       redirect('/onboarding')
     }
