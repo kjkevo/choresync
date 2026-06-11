@@ -64,18 +64,24 @@ export default async function DashboardPage({
   const profile = profileRaw as UserRow | null
 
   // No household yet — check if this is immediately after household creation
-  // If so, try one more time with a small delay to allow database to catch up
+  // If so, try multiple times with delays to allow database to catch up
   let allMembershipsData = allMemberships
   if (!allMemberships || allMemberships.length === 0) {
-    // Wait a bit for database write to propagate
-    await new Promise(resolve => setTimeout(resolve, 100))
-    const { data: retryMemberships } = await supabase
-      .from('household_members')
-      .select('household_id, role, color_theme')
-      .eq('user_id', user.id)
-    allMembershipsData = retryMemberships
+    // Try up to 3 times with increasing delays
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, attempt * 200))
+      const { data: retryMemberships } = await supabase
+        .from('household_members')
+        .select('household_id, role, color_theme')
+        .eq('user_id', user.id)
 
-    // Still nothing — redirect to onboarding
+      if (retryMemberships && retryMemberships.length > 0) {
+        allMembershipsData = retryMemberships
+        break
+      }
+    }
+
+    // Still nothing after 3 retries — redirect to onboarding
     if (!allMembershipsData || allMembershipsData.length === 0) {
       redirect('/onboarding')
     }
