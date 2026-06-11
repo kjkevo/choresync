@@ -63,15 +63,30 @@ export default async function DashboardPage({
   ])
   const profile = profileRaw as UserRow | null
 
-  // No household yet — redirect to onboarding to set one up
-  if (!allMemberships || allMemberships.length === 0) redirect('/onboarding')
+  // No household yet — check if this is immediately after household creation
+  // If so, try one more time with a small delay to allow database to catch up
+  let allMembershipsData = allMemberships
+  if (!allMemberships || allMemberships.length === 0) {
+    // Wait a bit for database write to propagate
+    await new Promise(resolve => setTimeout(resolve, 100))
+    const { data: retryMemberships } = await supabase
+      .from('household_members')
+      .select('household_id, role, color_theme')
+      .eq('user_id', user.id)
+    allMembershipsData = retryMemberships
+
+    // Still nothing — redirect to onboarding
+    if (!allMembershipsData || allMembershipsData.length === 0) {
+      redirect('/onboarding')
+    }
+  }
 
   // Pick active household: prefer ?h= param, else first membership
-  const allHouseholdIds = allMemberships.map(m => m.household_id)
+  const allHouseholdIds = allMembershipsData!.map(m => m.household_id)
   const requestedId     = params.h && allHouseholdIds.includes(params.h) ? params.h : null
   const activeMembership = requestedId
-    ? allMemberships.find(m => m.household_id === requestedId)!
-    : allMemberships[0]
+    ? allMembershipsData!.find(m => m.household_id === requestedId)!
+    : allMembershipsData![0]
 
   const { household_id: householdId } = activeMembership
 
