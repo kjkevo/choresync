@@ -69,9 +69,9 @@ export default function SettingsClient({ user }: SettingsClientProps) {
     {
       icon: '🛡️',
       title: 'Privacy & Data',
-      description: 'Export or delete your data',
+      description: 'Manage account deletion and privacy settings',
       action: () => {
-        router.push('/privacy')
+        router.push('/settings/delete-account')
       },
     },
   ]

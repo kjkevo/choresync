@@ -1321,7 +1321,7 @@ export default function ProfileClient({
         <SectionGroup title="Account & privacy">
           <ListRow icon="🔒" color="coral" label="Change password" sub="Update your login credentials" href="/settings/change-password" />
           <ListRow icon="✉️" color="coral" label="Email address" sub={user.email ?? '—'} onClick={() => openEdit('email')} />
-          <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Export or delete your data" href="/privacy" />
+          <ListRow icon="🛡️" color="coral" label="Privacy & data" sub="Delete account or manage privacy" href="/settings/delete-account" />
           <ListRow icon="🚪" color="pink" label="Sign out" labelColor="#993556"
             onClick={handleSignOut}
             right={isSigningOut ? <span style={{ fontSize: 12, color: '#9CA3AF' }}>Signing out…</span> : undefined}
