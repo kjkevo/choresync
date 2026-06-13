@@ -310,27 +310,36 @@ export default function OnboardingClient({ displayName, isLoggedIn, userId }: { 
     }
     const today = new Date().toISOString().split('T')[0]
     startTransition(async () => {
-      for (const chore of chores) {
-        const name = chore.name.trim()
-        if (!name) continue
-        const fd = new FormData()
-        fd.append('household_id', household.id)
-        fd.append('name', name)
-        fd.append('points', String(chore.points))
-        fd.append('frequency', chore.freq)
-        fd.append('category', 'general')
-        fd.append('due_date', today)   // show immediately in dashboard
-        // Assign "me" chores to the actual logged-in user
-        if (chore.assignTo === 'me' && userId) {
-          fd.append('assigned_to', userId)
+      try {
+        let successCount = 0
+        for (const chore of chores) {
+          const name = chore.name.trim()
+          if (!name) continue
+          const fd = new FormData()
+          fd.append('household_id', household.id)
+          fd.append('name', name)
+          fd.append('points', String(chore.points))
+          fd.append('frequency', chore.freq)
+          fd.append('category', 'general')
+          fd.append('due_date', today)   // show immediately in dashboard
+          // Assign "me" chores to the actual logged-in user
+          if (chore.assignTo === 'me' && userId) {
+            fd.append('assigned_to', userId)
+          }
+          const result = await createChore(fd)
+          if (result && 'error' in result && result.error) {
+            console.error('Chore creation error:', result.error)
+            setError(`Failed to create chore "${name}": ${result.error}`)
+            return
+          }
+          successCount++
         }
-        const result = await createChore(fd)
-        if (result && 'error' in result && result.error) {
-          setError(result.error)
-          return
-        }
+        console.log(`Successfully created ${successCount} chores`)
+        setStep('success')
+      } catch (err) {
+        console.error('Unexpected error in handleFinish:', err)
+        setError(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
-      setStep('success')
     })
   }
 
